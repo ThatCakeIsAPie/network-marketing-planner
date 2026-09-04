@@ -1,0 +1,21 @@
+package com.networkmarketing.planner.domain.model
+
+data class UserGoals(
+    val monthlyIncomeTarget: Double = 2_000.0,
+    val targetRankId: String = RankIds.SILVER,
+    val onboardingComplete: Boolean = false,
+    val disclaimerAccepted: Boolean = false,
+)
+
+object RankIds {
+    const val STARTER = "starter"
+    const val QUALIFIED = "qualified"
+    const val COORDINATOR = "coordinator"
+    const val GOLD = "gold"
+    const val SILVER = "silver"
+    const val PLATINUM = "platinum"
+    const val RUBY = "ruby"
+    const val EMERALD = "emerald"
+    const val DIAMOND = "diamond"
+}
+```
