@@ -5,8 +5,10 @@ import com.networkmarketing.planner.domain.model.PlannerSettings
 import com.networkmarketing.planner.domain.model.RankIds
 import com.networkmarketing.planner.domain.model.StructureKind
 import com.networkmarketing.planner.domain.model.UserGoals
+import kotlinx.serialization.Serializable
 import kotlin.math.max
 
+@Serializable
 data class StructureGap(
     val current: PayoutBreakdown,
     val ideal: PayoutBreakdown?,

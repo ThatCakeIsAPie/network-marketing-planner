@@ -1,5 +1,8 @@
 package com.networkmarketing.planner.domain.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 enum class StructureKind {
     CURRENT,
     IDEAL,
@@ -12,6 +15,7 @@ enum class StructureKind {
  * (upline). [canvasX] / [canvasY] are persisted world-space positions in dp
  * for the Map / Plan node canvas.
  */
+@Serializable
 data class OrgNode(
     val id: String,
     val memberId: String,

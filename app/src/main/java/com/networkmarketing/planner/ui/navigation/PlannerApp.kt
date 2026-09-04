@@ -45,7 +45,10 @@ private val tabs = listOf(
 
 @Composable
 fun PlannerApp(container: AppContainer) {
+    // Key by sync mode so switching between on-device and a server rebuilds the ViewModel
+    // with the correct repository after the activity recreates.
     val viewModel: PlannerViewModel = viewModel(
+        key = if (container.isRemote) "remote:${container.serverUrl}" else "local",
         factory = PlannerViewModel.factory(
             container.repository,
             container.compensationEngine,

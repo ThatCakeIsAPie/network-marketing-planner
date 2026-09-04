@@ -3,7 +3,7 @@ package com.networkmarketing.planner.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.networkmarketing.planner.data.repository.PlannerRepository
+import com.networkmarketing.planner.data.repository.PlannerStore
 import com.networkmarketing.planner.domain.canvas.CanvasMetrics
 import com.networkmarketing.planner.domain.canvas.LosGraph
 import com.networkmarketing.planner.domain.compensation.CompensationEngine
@@ -42,7 +42,7 @@ data class PlannerUiState(
 )
 
 class PlannerViewModel(
-    private val repository: PlannerRepository,
+    private val repository: PlannerStore,
     private val engine: CompensationEngine,
     private val gapAnalyzer: GapAnalyzer,
 ) : ViewModel() {
@@ -267,7 +267,7 @@ class PlannerViewModel(
 
     companion object {
         fun factory(
-            repository: PlannerRepository,
+            repository: PlannerStore,
             engine: CompensationEngine,
             gapAnalyzer: GapAnalyzer,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {

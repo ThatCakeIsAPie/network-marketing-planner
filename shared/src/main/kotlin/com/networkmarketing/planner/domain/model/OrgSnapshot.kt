@@ -1,15 +1,24 @@
 package com.networkmarketing.planner.domain.model
 
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
+
 /**
  * In-memory view of members plus current/ideal tree nodes.
  * Group volume is personal volume plus all descendants in the same structure.
  */
+@Serializable
 data class OrgSnapshot(
     val members: List<Member> = emptyList(),
     val nodes: List<OrgNode> = emptyList(),
 ) {
+    @Transient
     private val membersById: Map<String, Member> = members.associateBy { it.id }
+
+    @Transient
     private val nodesById: Map<String, OrgNode> = nodes.associateBy { it.id }
+
+    @Transient
     private val childrenByParent: Map<String?, List<OrgNode>> =
         nodes.groupBy { it.parentId }
 

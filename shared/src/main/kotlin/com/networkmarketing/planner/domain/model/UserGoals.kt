@@ -1,5 +1,8 @@
 package com.networkmarketing.planner.domain.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class UserGoals(
     val monthlyIncomeTarget: Double = 2_000.0,
     val targetRankId: String = RankIds.SILVER,

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>Network Marketing Planner</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+    <header class="app-header">
+        <div class="brand">
+            <span class="logo" aria-hidden="true">
+                <svg viewBox="0 0 48 48" width="28" height="28">
+                    <circle cx="24" cy="24" r="24" fill="#12674c"/>
+                    <circle cx="24" cy="14" r="4" fill="#fff"/>
+                    <circle cx="13" cy="30" r="4" fill="#c8a13a"/>
+                    <circle cx="24" cy="30" r="4" fill="#c8a13a"/>
+                    <circle cx="35" cy="30" r="4" fill="#c8a13a"/>
+                    <path d="M24 18 L13 27 M24 18 L24 27 M24 18 L35 27" stroke="#fff" stroke-width="2" fill="none"/>
+                </svg>
+            </span>
+            <div>
+                <h1>Network Marketing Planner</h1>
+                <p class="tagline">Shared planner &middot; browser, phone, and app read the same data</p>
+            </div>
+        </div>
+        <div class="header-actions">
+            <span id="sync-status" class="sync-status">Loading&hellip;</span>
+        </div>
+    </header>
+
+    <p class="disclaimer">
+        Unofficial planning tool. Not affiliated with, endorsed by, or sponsored by any network marketing
+        company. Formulas are simplified estimates &mdash; income is not guaranteed.
+    </p>
+
+    <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="map" role="tab">Map</button>
+        <button class="tab" data-tab="plan" role="tab">Plan</button>
+        <button class="tab" data-tab="calculator" role="tab">Calculator</button>
+        <button class="tab" data-tab="goals" role="tab">Goals</button>
+    </nav>
+
+    <main>
+        <!-- MAP / PLAN share the canvas layout -->
+        <section id="tab-map" class="tab-panel active">
+            <div class="panel-head">
+                <div>
+                    <h2>Organization map</h2>
+                    <p id="map-summary" class="muted">&nbsp;</p>
+                </div>
+                <div class="toolbar">
+                    <button class="btn" data-zoom="in" title="Zoom in">+</button>
+                    <button class="btn" data-zoom="out" title="Zoom out">&minus;</button>
+                    <button class="btn" data-zoom="fit">Fit</button>
+                    <button class="btn" id="map-layout">Auto layout</button>
+                    <button class="btn ghost" id="map-sample">Sample data</button>
+                </div>
+            </div>
+            <div class="canvas-wrap">
+                <svg id="map-canvas" class="org-canvas"></svg>
+                <aside id="map-inspector" class="inspector hidden"></aside>
+            </div>
+        </section>
+
+        <section id="tab-plan" class="tab-panel">
+            <div class="panel-head">
+                <div>
+                    <h2>Ideal structure</h2>
+                    <p id="plan-summary" class="muted">&nbsp;</p>
+                </div>
+                <div class="toolbar">
+                    <button class="btn" data-zoom="in" data-target="plan" title="Zoom in">+</button>
+                    <button class="btn" data-zoom="out" data-target="plan" title="Zoom out">&minus;</button>
+                    <button class="btn" data-zoom="fit" data-target="plan">Fit</button>
+                    <button class="btn" id="plan-layout">Auto layout</button>
+                </div>
+            </div>
+            <div class="canvas-wrap">
+                <svg id="plan-canvas" class="org-canvas"></svg>
+                <aside id="plan-inspector" class="inspector hidden"></aside>
+            </div>
+            <div id="gap-suggestions" class="card-list"></div>
+        </section>
+
+        <!-- CALCULATOR -->
+        <section id="tab-calculator" class="tab-panel">
+            <div class="panel-head"><h2>Volume calculator</h2></div>
+            <div class="estimate-hero">
+                <div class="estimate-label">Estimated monthly (current organization)</div>
+                <div id="estimate-amount" class="estimate-amount">$0.00</div>
+                <div id="estimate-sub" class="muted"></div>
+                <div class="progress"><div id="estimate-progress" class="progress-fill"></div></div>
+                <div id="estimate-goal" class="muted"></div>
+            </div>
+            <div id="calc-cards" class="card-grid"></div>
+        </section>
+
+        <!-- GOALS -->
+        <section id="tab-goals" class="tab-panel">
+            <div class="panel-head"><h2>Goals &amp; settings</h2></div>
+            <div class="form-card">
+                <label>Monthly income goal
+                    <input type="number" id="goal-income" min="0" step="100" />
+                </label>
+                <label>Rank goal
+                    <select id="goal-rank"></select>
+                </label>
+                <div class="row">
+                    <label class="grow">BV : PV ratio
+                        <input type="number" id="set-bvpv" min="0" step="0.01" />
+                    </label>
+                    <label class="grow">Retail margin
+                        <select id="set-retail">
+                            <option value="0.10">10%</option>
+                            <option value="0.15">15%</option>
+                            <option value="0.20">20%</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="toggles">
+                    <label class="toggle"><input type="checkbox" id="set-rule413" /> Rule 4.13 differential</label>
+                    <label class="toggle"><input type="checkbox" id="set-leadership" /> Leadership bonus</label>
+                    <label class="toggle"><input type="checkbox" id="set-depth" /> Depth bonus</label>
+                    <label class="toggle"><input type="checkbox" id="set-ruby" /> Ruby bonus</label>
+                    <label class="toggle"><input type="checkbox" id="set-plus" /> Performance Plus / Elite</label>
+                    <label class="toggle"><input type="checkbox" id="set-retail-on" /> Include retail margin</label>
+                </div>
+                <button class="btn primary" id="goals-save">Save goals &amp; settings</button>
+                <span id="goals-saved" class="saved-flag"></span>
+            </div>
+            <div class="form-card">
+                <h3 id="profile-title">Compensation profile</h3>
+                <p id="profile-note" class="muted"></p>
+                <div id="assumptions" class="assumptions"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Node inspector template is built in JS -->
+    <script src="app.js"></script>
+</body>
+</html>
