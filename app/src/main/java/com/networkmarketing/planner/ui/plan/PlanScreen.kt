@@ -100,6 +100,25 @@ fun PlanScreen(
                     state.idealPayout?.currentRank?.title,
                 )
             }
+            state.idealPayout?.let { ideal ->
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Ideal Core Plus snapshot", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            "Q month: ${if (ideal.silverProducerMonth) "yes" else "no"}. " +
+                                "25% legs: ${ideal.maxPercentLegs}. Width: ${ideal.corePlus.width}. " +
+                                "PQ: ${if (ideal.corePlus.pqMonth) "yes" else "no"} (Platinum+ toggle on Goals). " +
+                                "FQ: ${ideal.corePlus.fqCount}.",
+                        )
+                        Text(
+                            "Plus/Elite ${money(ideal.corePlus.performancePlusAmount)} · " +
+                                "BFI ${money(ideal.corePlus.bfiAmount)} · BBI ${money(ideal.corePlus.bbiAmount)}.",
+                        )
+                        Text(ideal.corePlus.pqAnnualLabel)
+                        ideal.corePlus.progressNotes.take(3).forEach { Text("• $it") }
+                    }
+                }
+            }
             OutlinedButton(onClick = { viewModel.copyCurrentToIdeal() }, modifier = Modifier.fillMaxWidth()) {
                 Text("Copy current map into ideal")
             }

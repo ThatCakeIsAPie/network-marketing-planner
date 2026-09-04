@@ -77,7 +77,7 @@ fun CalculatorScreen(
                     onValueChange = {
                         viewModel.setCalculatorFields(state.calculatorPersonalPv, it, state.calculatorMaxLegs, false)
                     },
-                    label = { Text("Group PV (personal + downline)") },
+                    label = { Text("Group PV (Personal + non-25% pass-up)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -86,37 +86,48 @@ fun CalculatorScreen(
                     onValueChange = {
                         viewModel.setCalculatorFields(state.calculatorPersonalPv, state.calculatorGroupPv, it, false)
                     },
-                    label = { Text("Frontline already at max bracket") },
+                    label = { Text("Frontline at 25% this month") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
-                    "BV is personal/group PV × ${state.settings.bvPerPv} (editable in Goals). Max-bracket legs are modeled at ${qty(viewModel.engine().config().brackets.maxBy { it.minPv }.minPv)} PV each.",
+                    "Profile ${viewModel.engine().config().profileId}. BV = PV × ${state.settings.bvPerPv}. " +
+                        "25% legs are excluded from Group/Ruby PV. Rule 4.12 factor ${percent(payout.rule412Factor)}.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
             PayoutSummary(payout, state.goals.monthlyIncomeTarget)
             MetricRow {
+                MetricCard("Group PV", qty(payout.group.pv), Modifier.weight(1f), "${qty(payout.passUp.pv)} pass-up")
+                MetricCard("Ruby / side", qty(payout.rubyPv), Modifier.weight(1f), "${qty(payout.totalDownline.pv)} team PV")
+            }
+            MetricRow {
                 MetricCard("Performance", money(payout.performanceBonus), Modifier.weight(1f), percent(payout.performancePercent))
                 MetricCard("Differential", money(payout.differential), Modifier.weight(1f), "in the performance total")
             }
             MetricRow {
-                MetricCard("Leadership", money(payout.leadershipBonus), Modifier.weight(1f))
-                MetricCard("Ruby-volume", money(payout.rubyBonus), Modifier.weight(1f), "${qty(payout.rubyPv)} ruby PV")
-                MetricCard("Customer profit", money(payout.customerProfit), Modifier.weight(1f))
+                MetricCard("Leadership", money(payout.leadershipBonus), Modifier.weight(1f), "pass-up ${money(payout.leadershipPassedToSponsor)}")
+                MetricCard("Depth", money(payout.depthBonus), Modifier.weight(1f))
+                MetricCard("Ruby bonus", money(payout.rubyBonus), Modifier.weight(1f), "≥15k Ruby PV")
+            }
+            MetricRow {
+                MetricCard("Plus / Elite", money(payout.corePlus.performancePlusAmount), Modifier.weight(1f), percent(payout.corePlus.performancePlusPercent))
+                MetricCard("Retail", money(payout.retailMargin), Modifier.weight(1f), percent(state.settings.retailMarginPercent))
             }
             Card(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Toward ${target.title}", style = MaterialTheme.typography.titleLarge)
+                    Text(need.hint)
                     if (need.met) {
-                        Text("These inputs already meet the selected rank under the default engine.")
+                        Text("These inputs already meet the selected rank under the AmwayNA_PY2027 snapshot rules.")
                     } else {
-                        if (need.pvNeeded > 0) Text("Need ${qty(need.pvNeeded)} more group PV.")
-                        if (need.maxPercentLegsNeeded > 0) Text("Need ${need.maxPercentLegsNeeded} more max-bracket frontline.")
-                        if (need.rubyPvNeeded > 0) Text("Need ${qty(need.rubyPvNeeded)} more ruby PV.")
+                        if (need.pvNeeded > 0) Text("Need ${qty(need.pvNeeded)} more Group PV (or use another Q-month path).")
+                        if (need.maxPercentLegsNeeded > 0) Text("Need ${need.maxPercentLegsNeeded} more 25% frontline.")
+                        if (need.rubyPvNeeded > 0) Text("Need ${qty(need.rubyPvNeeded)} more Ruby PV.")
                     }
+                    Text("Q month: ${if (payout.silverProducerMonth) "yes" else "no"}. PQ: ${if (payout.corePlus.pqMonth) "yes" else "no"}. FQ this month: ${payout.corePlus.fqCount}.")
                     Text(
-                        "Formulas live in CompensationEngine / CompensationConfig. Toggle leadership, ruby, and customer profit in Goals.",
+                        "Formulas: CompensationEngine + AmwayNA_PY2027. Annual Core Plus (PQ/TTCI) uses YTD fields on Goals.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }

@@ -148,17 +148,22 @@ class PlannerViewModel(
         val personalPv = state.calculatorPersonalPv.toDoubleOrNull() ?: 0.0
         val groupPv = state.calculatorGroupPv.toDoubleOrNull() ?: personalPv
         val maxLegs = state.calculatorMaxLegs.toIntOrNull() ?: 0
-        val remaining = (groupPv - personalPv).coerceAtLeast(0.0)
+        val passUp = (groupPv - personalPv).coerceAtLeast(0.0)
+        val maxPv = engine.config().silverProducerGroupPv
+        val passUpPercent = engine.config().bracketFor(passUp.coerceAtMost(maxPv - 0.01)).percent
         val frontline = buildList {
-            val maxPv = engine.config().brackets.maxBy { it.minPv }.minPv
             repeat(maxLegs) {
-                add(FrontlineVolume("Max-bracket leg ${it + 1}", maxPv, engine.bvForPv(maxPv, state.settings)))
+                add(FrontlineVolume("25% leg ${it + 1}", maxPv, engine.bvForPv(maxPv, state.settings)))
             }
-            if (remaining > maxLegs * maxPv) {
-                val leftover = remaining - maxLegs * maxPv
-                add(FrontlineVolume("Other volume", leftover, engine.bvForPv(leftover, state.settings)))
-            } else if (maxLegs == 0 && remaining > 0) {
-                add(FrontlineVolume("Downline", remaining, engine.bvForPv(remaining, state.settings)))
+            if (passUp > 0) {
+                add(
+                    FrontlineVolume(
+                        name = "Pass-up (non-25%)",
+                        groupPv = passUp,
+                        groupBv = engine.bvForPv(passUp, state.settings),
+                        performancePercent = passUpPercent,
+                    ),
+                )
             }
         }
         return engine.evaluateInputs(

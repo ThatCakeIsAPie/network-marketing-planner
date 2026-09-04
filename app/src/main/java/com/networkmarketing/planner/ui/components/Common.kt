@@ -70,7 +70,11 @@ fun PayoutSummary(payout: PayoutBreakdown, incomeGoal: Double) {
             Text("Estimated monthly", style = MaterialTheme.typography.labelLarge)
             Text(money(payout.estimatedMonthly), style = MaterialTheme.typography.headlineMedium)
             Text(
-                "${payout.currentRank.title} · ${percent(payout.performancePercent)} of ${qty(payout.group.bv)} group BV",
+                buildString {
+                    append(payout.currentRank.title)
+                    if (payout.silverProducerMonth) append(" · Q month")
+                    append(" · ${percent(payout.performancePercent)} · Group ${qty(payout.group.pv)} PV")
+                },
                 style = MaterialTheme.typography.bodyMedium,
             )
             LinearProgressIndicator(

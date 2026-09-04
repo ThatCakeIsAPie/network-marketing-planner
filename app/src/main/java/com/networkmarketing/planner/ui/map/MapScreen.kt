@@ -64,9 +64,9 @@ fun MapScreen(
             if (payout != null) {
                 PayoutSummary(payout, state.goals.monthlyIncomeTarget)
                 MetricRow {
-                    MetricCard("Group PV", qty(payout.group.pv), Modifier.weight(1f), "${qty(payout.group.bv)} BV")
-                    MetricCard("Rank", payout.currentRank.title, Modifier.weight(1f), percent(payout.performancePercent))
-                    MetricCard("Max-bracket legs", payout.maxPercentLegs.toString(), Modifier.weight(1f), "${payout.frontlineCount} frontline")
+                    MetricCard("Group PV", qty(payout.group.pv), Modifier.weight(1f), "Ruby ${qty(payout.rubyPv)} · Team ${qty(payout.totalDownline.pv)}")
+                    MetricCard("Rank", payout.currentRank.title, Modifier.weight(1f), if (payout.silverProducerMonth) "Q month · ${percent(payout.performancePercent)}" else percent(payout.performancePercent))
+                    MetricCard("25% legs", payout.maxPercentLegs.toString(), Modifier.weight(1f), "${payout.frontlineCount} frontline")
                 }
             }
             FilterChip(

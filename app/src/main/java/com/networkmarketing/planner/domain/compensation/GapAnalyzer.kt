@@ -2,6 +2,7 @@ package com.networkmarketing.planner.domain.compensation
 
 import com.networkmarketing.planner.domain.model.OrgSnapshot
 import com.networkmarketing.planner.domain.model.PlannerSettings
+import com.networkmarketing.planner.domain.model.RankIds
 import com.networkmarketing.planner.domain.model.StructureKind
 import com.networkmarketing.planner.domain.model.UserGoals
 import kotlin.math.max
@@ -45,8 +46,13 @@ class GapAnalyzer(
             }
             if (need.rubyPvNeeded > 0) {
                 add(
-                    "Build ${need.rubyPvNeeded.toInt()} more ruby PV (volume that is not inside a max-bracket frontline).",
+                    "Build ${need.rubyPvNeeded.toInt()} more Ruby/Side PV (Personal + pass-up, excluding 25% legs).",
                 )
+            }
+            if (!current.silverProducerMonth &&
+                (targetRank.id == RankIds.SILVER || targetRank.minGroupPv >= 7_500)
+            ) {
+                add(engine.silverProducerHint(current))
             }
             val incomeGap = max(0.0, goals.monthlyIncomeTarget - current.estimatedMonthly)
             if (incomeGap > 1.0) {

@@ -9,8 +9,8 @@ import java.util.UUID
 /**
  * Demo organization so the app is useful on first launch.
  *
- * Current map is a mid-build team (coordinator-range group PV).
- * Ideal map is a six-leg diamond-track sketch with stronger personal volume.
+ * Current map is a developing team (no 25% legs; Group PV in the low 1,000s).
+ * Ideal map is a six-leg Diamond-track snapshot: six 25% frontline, two with 25% depth.
  */
 object SampleData {
     const val YOU_ID = "member-you"
@@ -64,18 +64,17 @@ object SampleData {
             node("n-priya", "m-priya", currentRoot.id, StructureKind.CURRENT, 85.0, bvPerPv),
         )
 
-        // Six legs near 7,500 PV each would be a huge demo; keep the ideal
-        // map readable: six developing legs, two of them already at 25%.
+        // Six 25% frontline legs (Diamond-track monthly snapshot); two have a 25% downline for Depth Bonus.
         val idealNodes = listOf(
             idealRoot,
-            node("n-leg1", "m-leg1", idealRoot.id, StructureKind.IDEAL, 400.0, bvPerPv),
-            node("n-leg2", "m-leg2", idealRoot.id, StructureKind.IDEAL, 350.0, bvPerPv),
-            node("n-leg3", "m-leg3", idealRoot.id, StructureKind.IDEAL, 300.0, bvPerPv),
-            node("n-leg4", "m-leg4", idealRoot.id, StructureKind.IDEAL, 280.0, bvPerPv),
-            node("n-leg5", "m-leg5", idealRoot.id, StructureKind.IDEAL, 260.0, bvPerPv),
-            node("n-leg6", "m-leg6", idealRoot.id, StructureKind.IDEAL, 240.0, bvPerPv),
-            node("n-depth-a", "m-depth-a", "n-leg1", StructureKind.IDEAL, 7_200.0, bvPerPv),
-            node("n-depth-b", "m-depth-b", "n-leg2", StructureKind.IDEAL, 7_200.0, bvPerPv),
+            node("n-leg1", "m-leg1", idealRoot.id, StructureKind.IDEAL, 7_500.0, bvPerPv),
+            node("n-leg2", "m-leg2", idealRoot.id, StructureKind.IDEAL, 7_500.0, bvPerPv),
+            node("n-leg3", "m-leg3", idealRoot.id, StructureKind.IDEAL, 7_500.0, bvPerPv),
+            node("n-leg4", "m-leg4", idealRoot.id, StructureKind.IDEAL, 7_500.0, bvPerPv),
+            node("n-leg5", "m-leg5", idealRoot.id, StructureKind.IDEAL, 7_500.0, bvPerPv),
+            node("n-leg6", "m-leg6", idealRoot.id, StructureKind.IDEAL, 7_500.0, bvPerPv),
+            node("n-depth-a", "m-depth-a", "n-leg1", StructureKind.IDEAL, 7_500.0, bvPerPv),
+            node("n-depth-b", "m-depth-b", "n-leg2", StructureKind.IDEAL, 7_500.0, bvPerPv),
         )
 
         return OrgSnapshot(members = members, nodes = currentNodes + idealNodes)

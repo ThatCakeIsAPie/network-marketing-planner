@@ -10,11 +10,14 @@ data class UserGoals(
 object RankIds {
     const val STARTER = "starter"
     const val QUALIFIED = "qualified"
-    const val COORDINATOR = "coordinator"
-    const val GOLD = "gold"
+    const val BRONZE = "bronze"
     const val SILVER = "silver"
+    const val GOLD = "gold"
     const val PLATINUM = "platinum"
+    const val FOUNDERS_PLATINUM = "founders_platinum"
     const val RUBY = "ruby"
     const val EMERALD = "emerald"
     const val DIAMOND = "diamond"
+
+    const val COORDINATOR = BRONZE
 }
