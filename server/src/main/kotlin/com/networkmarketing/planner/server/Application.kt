@@ -164,6 +164,10 @@ private fun io.ktor.server.routing.Routing.plannerApi(
         call.respond(store.update { it.copy(snapshot = SnapshotOps.restoreSample(it.settings.bvPerPv)) })
     }
 
+    post("/api/copy-current-to-ideal") {
+        call.respond(store.update { it.copy(snapshot = SnapshotOps.copyCurrentToIdeal(it.snapshot, it.settings.bvPerPv)) })
+    }
+
     get("/api/calculator") {
         val kind = call.kindParam()
         val state = store.read()

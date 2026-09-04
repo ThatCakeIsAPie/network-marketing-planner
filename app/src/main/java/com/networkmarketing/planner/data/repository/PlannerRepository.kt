@@ -21,8 +21,8 @@ import kotlinx.coroutines.flow.map
 
 class PlannerRepository(
     private val dao: PlannerDao,
-) {
-    val snapshot: Flow<OrgSnapshot> = combine(
+) : PlannerStore {
+    override val snapshot: Flow<OrgSnapshot> = combine(
         dao.observeMembers(),
         dao.observeNodes(),
     ) { members, nodes ->
@@ -32,12 +32,12 @@ class PlannerRepository(
         )
     }
 
-    val prefs: Flow<Pair<UserGoals, PlannerSettings>> = dao.observePrefs().map { entity ->
+    override val prefs: Flow<Pair<UserGoals, PlannerSettings>> = dao.observePrefs().map { entity ->
         val prefs = entity ?: defaultPrefs()
         prefs.toGoals() to prefs.toSettings()
     }
 
-    suspend fun ensureSeeded() {
+    override suspend fun ensureSeeded() {
         if (dao.nodeCount() == 0) {
             val seeded = SampleData.snapshot(PlannerSettings.DEFAULT_BV_PER_PV)
             dao.replaceOrganization(seeded.members.map { it.toEntity() }, seeded.nodes.map { it.toEntity() })
@@ -47,13 +47,13 @@ class PlannerRepository(
         }
     }
 
-    suspend fun restoreSampleData() {
+    override suspend fun restoreSampleData() {
         val current = dao.getPrefs() ?: defaultPrefs()
         val seeded = SampleData.snapshot(current.bvPerPv)
         dao.replaceOrganization(seeded.members.map { it.toEntity() }, seeded.nodes.map { it.toEntity() })
     }
 
-    suspend fun saveGoals(goals: UserGoals) {
+    override suspend fun saveGoals(goals: UserGoals) {
         val current = dao.getPrefs() ?: defaultPrefs()
         dao.upsertPrefs(
             current.copy(
@@ -65,7 +65,7 @@ class PlannerRepository(
         )
     }
 
-    suspend fun saveSettings(settings: PlannerSettings) {
+    override suspend fun saveSettings(settings: PlannerSettings) {
         val current = dao.getPrefs() ?: defaultPrefs()
         dao.upsertPrefs(
             current.copy(
@@ -121,10 +121,12 @@ class PlannerRepository(
             name = name,
             personalPv = personalPv,
             bvPerPv = bvPerPv,
+            partnerName = "",
+            isCouple = false,
         )
     }
 
-    suspend fun addNode(
+    override suspend fun addNode(
         kind: StructureKind,
         canvasX: Float,
         canvasY: Float,
@@ -132,8 +134,8 @@ class PlannerRepository(
         name: String,
         personalPv: Double,
         bvPerPv: Double,
-        partnerName: String = "",
-        isCouple: Boolean = false,
+        partnerName: String,
+        isCouple: Boolean,
     ): String {
         val memberId = SampleData.newId("member")
         val nodeId = SampleData.newId("node")
@@ -162,7 +164,7 @@ class PlannerRepository(
         return nodeId
     }
 
-    suspend fun savePerson(
+    override suspend fun savePerson(
         node: OrgNode,
         name: String,
         partnerName: String,
@@ -198,23 +200,23 @@ class PlannerRepository(
         )
     }
 
-    suspend fun updatePosition(node: OrgNode, canvasX: Float, canvasY: Float) {
+    override suspend fun updatePosition(node: OrgNode, canvasX: Float, canvasY: Float) {
         dao.updateNode(node.copy(canvasX = canvasX, canvasY = canvasY).toEntity())
     }
 
-    suspend fun setParent(snapshot: OrgSnapshot, childId: String, parentId: String?): Boolean {
+    override suspend fun setParent(snapshot: OrgSnapshot, childId: String, parentId: String?): Boolean {
         if (!LosGraph.canSetParent(snapshot, childId, parentId)) return false
         val child = snapshot.node(childId) ?: return false
         dao.updateNode(child.copy(parentId = parentId).toEntity())
         return true
     }
 
-    suspend fun applyLayout(snapshot: OrgSnapshot, kind: StructureKind) {
+    override suspend fun applyLayout(snapshot: OrgSnapshot, kind: StructureKind) {
         val placed = TreeLayout.applyPositions(snapshot, kind)
         placed.forEach { dao.updateNode(it.toEntity()) }
     }
 
-    suspend fun deleteSubtree(snapshot: OrgSnapshot, nodeId: String) {
+    override suspend fun deleteSubtree(snapshot: OrgSnapshot, nodeId: String) {
         val node = snapshot.node(nodeId) ?: return
         if (snapshot.isYou(node)) return
         val ids = listOf(nodeId) + snapshot.descendants(nodeId).map { it.id }
@@ -222,7 +224,7 @@ class PlannerRepository(
         dao.deleteMember(node.memberId)
     }
 
-    suspend fun copyCurrentToIdeal(snapshot: OrgSnapshot, bvPerPv: Double) {
+    override suspend fun copyCurrentToIdeal(snapshot: OrgSnapshot, bvPerPv: Double) {
         val mapping = mutableMapOf<String, String>()
         val rebuilt = topological(snapshot.nodes(StructureKind.CURRENT)).map { src ->
             val newId = if (snapshot.isYou(src)) "n-you-ideal" else SampleData.newId("node")

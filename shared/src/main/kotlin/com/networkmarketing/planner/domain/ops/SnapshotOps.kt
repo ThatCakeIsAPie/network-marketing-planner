@@ -127,4 +127,36 @@ object SnapshotOps {
     }
 
     fun restoreSample(bvPerPv: Double): OrgSnapshot = SampleData.snapshot(bvPerPv)
+
+    /** Replace the ideal structure with a copy of the current one (same people, IDEAL kind). */
+    fun copyCurrentToIdeal(snapshot: OrgSnapshot, bvPerPv: Double): OrgSnapshot {
+        val mapping = mutableMapOf<String, String>()
+        val rebuilt = topological(snapshot.nodes(StructureKind.CURRENT)).map { src ->
+            val newId = if (snapshot.isYou(src)) "n-you-ideal" else SampleData.newId("node")
+            mapping[src.id] = newId
+            src.copy(
+                id = newId,
+                parentId = src.parentId?.let { mapping[it] },
+                kind = StructureKind.IDEAL,
+                personalBv = src.personalPv * bvPerPv,
+            )
+        }
+        return snapshot.copy(nodes = snapshot.nodes(StructureKind.CURRENT) + rebuilt)
+    }
+
+    private fun topological(nodes: List<OrgNode>): List<OrgNode> {
+        val byParent = nodes.groupBy { it.parentId }
+        val ids = nodes.map { it.id }.toSet()
+        val result = mutableListOf<OrgNode>()
+        val roots = nodes.filter { it.parentId == null || it.parentId !in ids }
+        val queue = ArrayDeque(roots)
+        val seen = mutableSetOf<String>()
+        while (queue.isNotEmpty()) {
+            val n = queue.removeFirst()
+            if (!seen.add(n.id)) continue
+            result += n
+            queue.addAll(byParent[n.id].orEmpty())
+        }
+        return result
+    }
 }

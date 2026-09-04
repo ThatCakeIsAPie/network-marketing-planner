@@ -32,8 +32,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import android.app.Activity
+import com.networkmarketing.planner.data.remote.ServerPreferences
 import com.networkmarketing.planner.domain.compensation.AmwayNaPy2027
 import com.networkmarketing.planner.ui.PlannerUiState
 import com.networkmarketing.planner.ui.PlannerViewModel
@@ -87,6 +90,9 @@ fun GoalsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             DisclaimerBanner()
+
+            SyncCard()
+
             Text(config.profileTitle, style = MaterialTheme.typography.titleLarge)
             Text(config.sourceNote, style = MaterialTheme.typography.bodyMedium)
 
@@ -289,6 +295,46 @@ fun GoalsScreen(
                 onClick = { viewModel.restoreSample() },
                 modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
             ) { Text("Restore sample organization") }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SyncCard() {
+    val context = LocalContext.current
+    val serverPrefs = remember { ServerPreferences(context) }
+    var url by rememberSaveable { mutableStateOf(serverPrefs.serverUrl) }
+    val isRemote = serverPrefs.isRemote
+
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Sync", style = MaterialTheme.typography.titleLarge)
+            Text(
+                if (isRemote) {
+                    "Connected to the shared server. The browser, phone browser, and this app all read the same data.\n${serverPrefs.serverUrl}"
+                } else {
+                    "This device only. Enter a server URL to share data with the browser version."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            OutlinedTextField(
+                value = url,
+                onValueChange = { url = it },
+                label = { Text("Server URL (e.g. http://10.0.2.2:8080)") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = {
+                    serverPrefs.serverUrl = url
+                    (context as? Activity)?.recreate()
+                }) { Text("Connect & sync") }
+                OutlinedButton(onClick = {
+                    serverPrefs.clear()
+                    url = ""
+                    (context as? Activity)?.recreate()
+                }) { Text("Use this device only") }
+            }
         }
     }
 }
