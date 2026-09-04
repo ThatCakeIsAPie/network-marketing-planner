@@ -221,12 +221,17 @@ function fitBox(nodes, svg) {
 function attachPanZoom(svg, which, kind) {
   if (svg.dataset.wired) return;
   svg.dataset.wired = "1";
-  let dragging = false, lastX = 0, lastY = 0;
+  let dragging = false, captured = false, lastX = 0, lastY = 0, startX = 0, startY = 0;
   svg.addEventListener("pointerdown", (e) => {
-    dragging = true; lastX = e.clientX; lastY = e.clientY; svg.setPointerCapture(e.pointerId);
+    // Do NOT capture yet: capturing here would steal the click from node cards.
+    dragging = true; captured = false;
+    lastX = e.clientX; lastY = e.clientY; startX = e.clientX; startY = e.clientY;
   });
   svg.addEventListener("pointermove", (e) => {
     if (!dragging) return;
+    // Only begin a real pan (and capture the pointer) once the user clearly drags.
+    if (!captured && Math.hypot(e.clientX - startX, e.clientY - startY) < 4) return;
+    if (!captured) { captured = true; try { svg.setPointerCapture(e.pointerId); } catch (_) {} }
     const box = view[which].box;
     const rect = svg.getBoundingClientRect();
     const scale = box.w / rect.width;
@@ -235,9 +240,9 @@ function attachPanZoom(svg, which, kind) {
     lastX = e.clientX; lastY = e.clientY;
     svg.setAttribute("viewBox", `${box.x} ${box.y} ${box.w} ${box.h}`);
   });
-  const stop = () => { dragging = false; };
+  const stop = () => { dragging = false; captured = false; };
   svg.addEventListener("pointerup", stop);
-  svg.addEventListener("pointerleave", stop);
+  svg.addEventListener("pointercancel", stop);
   svg.addEventListener("wheel", (e) => {
     e.preventDefault();
     zoom(which, e.deltaY < 0 ? 0.9 : 1.1);
