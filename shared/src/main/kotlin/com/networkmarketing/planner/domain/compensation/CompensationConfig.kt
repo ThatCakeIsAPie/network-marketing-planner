@@ -1,16 +1,20 @@
 package com.networkmarketing.planner.domain.compensation
 
+import kotlinx.serialization.Serializable
+
 /**
  * One row of the monthly performance-bonus schedule.
  * [percent] is a fraction (0.25 = 25% of BV).
  * [maxPvExclusive] is the exclusive upper bound; null means no upper bound.
  */
+@Serializable
 data class PerformanceBracket(
     val minPv: Double,
     val maxPvExclusive: Double?,
     val percent: Double,
 )
 
+@Serializable
 data class RankDefinition(
     val id: String,
     val title: String,
@@ -21,6 +25,7 @@ data class RankDefinition(
     val summary: String,
 )
 
+@Serializable
 data class CorePlusPqTier(
     val minPqMonths: Int,
     val minAnnualRubyPv: Double = 0.0,
@@ -28,6 +33,7 @@ data class CorePlusPqTier(
     val label: String,
 )
 
+@Serializable
 data class TwoTimeCashIncentive(
     val rankId: String,
     val firstYearAmount: Double,
@@ -39,6 +45,7 @@ data class TwoTimeCashIncentive(
  * All rates and tables for a named compensation profile.
  * Keep payout math in [CompensationEngine] / [LeadershipBonus]; keep numbers here.
  */
+@Serializable
 data class CompensationConfig(
     val profileId: String,
     val profileTitle: String,

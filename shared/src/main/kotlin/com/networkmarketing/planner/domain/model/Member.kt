@@ -1,9 +1,12 @@
 package com.networkmarketing.planner.domain.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * A person (or couple) in the organization. The same member can appear in both
  * the current and ideal structures.
  */
+@Serializable
 data class Member(
     val id: String,
     val name: String,

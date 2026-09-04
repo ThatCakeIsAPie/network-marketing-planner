@@ -5,6 +5,7 @@ import com.networkmarketing.planner.domain.model.PlannerSettings
 import com.networkmarketing.planner.domain.model.RankIds
 import com.networkmarketing.planner.domain.model.StructureKind
 import com.networkmarketing.planner.domain.model.Volume
+import kotlinx.serialization.Serializable
 import kotlin.math.max
 import kotlin.math.min
 
@@ -18,6 +19,7 @@ data class FrontlineVolume(
     val leadershipRollUp: Double? = null,
 )
 
+@Serializable
 data class CorePlusStatus(
     val baselineMet: Boolean,
     val silverProducerMonth: Boolean,
@@ -40,6 +42,7 @@ data class CorePlusStatus(
     val progressNotes: List<String>,
 )
 
+@Serializable
 data class PayoutBreakdown(
     val group: Volume,
     val personal: Volume,

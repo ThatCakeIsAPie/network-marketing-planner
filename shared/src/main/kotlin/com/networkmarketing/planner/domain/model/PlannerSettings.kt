@@ -1,5 +1,8 @@
 package com.networkmarketing.planner.domain.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class PlannerSettings(
     val bvPerPv: Double = DEFAULT_BV_PER_PV,
     val retailMarginPercent: Double = DEFAULT_RETAIL_MARGIN,
