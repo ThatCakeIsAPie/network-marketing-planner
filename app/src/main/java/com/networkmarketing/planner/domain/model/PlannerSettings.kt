@@ -13,4 +13,3 @@ data class PlannerSettings(
         const val DEFAULT_CUSTOMER_PROFIT = 0.10
     }
 }
-```

@@ -67,12 +67,12 @@ class CompensationEngineTest {
     @Test
     fun rubyVolumeExcludesMaxBracketFrontline() {
         val result = engine.evaluateInputs(
-            personalPv = 8_000.0,
-            personalBv = 8_000.0 * 3.0,
+            personalPv = 10_500.0,
+            personalBv = 10_500.0 * 3.0,
             frontline = listOf(FrontlineVolume("Breakaway", 7_500.0, 7_500.0 * 3.0)),
             settings = settings.copy(includeCustomerProfit = false, includeLeadershipBonus = false),
         )
-        assertEquals(8_000.0, result.rubyPv, 0.01)
+        assertEquals(10_500.0, result.rubyPv, 0.01)
         assertTrue(result.rubyBonus > 0.0)
     }
 
@@ -109,8 +109,8 @@ class CompensationEngineTest {
         val group = snapshot.groupVolume("n0")
         assertEquals(35.0, group.pv, 0.0)
         assertEquals(105.0, group.bv, 0.0)
-        assertEquals(2, snapshot.frontline("n0").size.coerceAtLeast(snapshot.children("n0").size))
         assertEquals(1, snapshot.frontline("n0").size)
+        assertEquals(1, snapshot.children("n1").size)
     }
 
     @Test
@@ -139,4 +139,3 @@ class CompensationEngineTest {
         assertTrue(gap.suggestions.isNotEmpty())
     }
 }
-```

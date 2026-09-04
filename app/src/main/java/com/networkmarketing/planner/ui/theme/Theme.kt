@@ -52,4 +52,3 @@ fun PlannerTheme(
         content = content,
     )
 }
-```

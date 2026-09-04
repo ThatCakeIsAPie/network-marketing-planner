@@ -51,4 +51,3 @@ data class CompensationConfig(
         fun default(): CompensationConfig = DefaultCompensation.US_STYLE
     }
 }
-```

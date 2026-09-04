@@ -10,4 +10,3 @@ data class Member(
     val notes: String = "",
     val isYou: Boolean = false,
 )
-```

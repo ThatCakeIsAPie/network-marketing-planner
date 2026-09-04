@@ -181,4 +181,3 @@ private fun SettingSwitch(label: String, checked: Boolean, onChange: (Boolean) -
         Switch(checked = checked, onCheckedChange = onChange)
     }
 }
-```

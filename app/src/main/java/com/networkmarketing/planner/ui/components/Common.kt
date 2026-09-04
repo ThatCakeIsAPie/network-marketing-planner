@@ -99,4 +99,3 @@ fun DisclaimerBanner(compact: Boolean = false) {
         modifier = Modifier.padding(vertical = 4.dp),
     )
 }
-```

@@ -25,4 +25,3 @@ data class OrgNodeEntity(
     val personalPv: Double,
     val personalBv: Double,
 )
-```

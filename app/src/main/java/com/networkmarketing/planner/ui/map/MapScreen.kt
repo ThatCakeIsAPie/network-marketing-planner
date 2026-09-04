@@ -128,4 +128,3 @@ fun MapScreen(
         )
     }
 }
-```

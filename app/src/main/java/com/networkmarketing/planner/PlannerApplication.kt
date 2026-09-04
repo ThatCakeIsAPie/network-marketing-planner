@@ -12,4 +12,3 @@ class PlannerApplication : Application() {
         container = AppContainer(this)
     }
 }
-```

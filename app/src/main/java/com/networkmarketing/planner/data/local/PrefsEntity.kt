@@ -20,4 +20,3 @@ data class PrefsEntity(
         const val SINGLETON_ID = 1
     }
 }
-```

@@ -99,4 +99,3 @@ object SampleData {
 
     fun newId(prefix: String = "id"): String = "$prefix-${UUID.randomUUID().toString().take(8)}"
 }
-```

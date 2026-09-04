@@ -12,4 +12,3 @@ class AppContainer(context: Context) {
     val compensationEngine = CompensationEngine()
     val gapAnalyzer = GapAnalyzer(compensationEngine)
 }
-```

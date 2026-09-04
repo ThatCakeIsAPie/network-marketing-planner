@@ -110,4 +110,3 @@ fun OnboardingScreen(viewModel: PlannerViewModel) {
         }
     }
 }
-```

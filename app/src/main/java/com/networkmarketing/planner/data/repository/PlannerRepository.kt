@@ -209,4 +209,3 @@ private fun PrefsEntity.toSettings() = PlannerSettings(
     includeLeadershipBonus = includeLeadershipBonus,
     includeRubyBonus = includeRubyBonus,
 )
-```

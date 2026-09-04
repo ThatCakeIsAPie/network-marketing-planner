@@ -79,4 +79,3 @@ data class OrgSnapshot(
         return rows
     }
 }
-```

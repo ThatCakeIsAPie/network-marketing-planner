@@ -9,4 +9,3 @@ val Gold = Color(0xFFC4A35A)
 val Cream = Color(0xFFF6F4EE)
 val Ink = Color(0xFF1A1C1A)
 val Mist = Color(0xFFE7EEEA)
-```

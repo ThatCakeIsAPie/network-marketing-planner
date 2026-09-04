@@ -197,4 +197,3 @@ private data class CalculatorFields(
 
 fun PlannerUiState.selectedNode(): OrgNode? =
     selectedNodeId?.let { snapshot.node(it) } ?: snapshot.root(StructureKind.CURRENT)
-```

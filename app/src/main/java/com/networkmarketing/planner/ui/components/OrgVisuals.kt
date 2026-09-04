@@ -114,4 +114,3 @@ private fun TreeNodeRow(
         TreeNodeRow(snapshot, child, depth + 1, selectedId, onSelect)
     }
 }
-```

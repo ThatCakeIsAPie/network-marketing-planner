@@ -18,4 +18,3 @@ object RankIds {
     const val EMERALD = "emerald"
     const val DIAMOND = "diamond"
 }
-```

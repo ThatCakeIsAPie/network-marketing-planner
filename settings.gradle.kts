@@ -16,4 +16,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "NetworkMarketingPlanner"
 include(":app")
-```

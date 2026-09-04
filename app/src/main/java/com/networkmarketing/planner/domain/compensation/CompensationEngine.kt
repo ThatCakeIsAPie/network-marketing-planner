@@ -208,4 +208,3 @@ data class RankNeed(
     val met: Boolean
         get() = pvNeeded <= 0.0 && maxPercentLegsNeeded <= 0 && rubyPvNeeded <= 0.0
 }
-```

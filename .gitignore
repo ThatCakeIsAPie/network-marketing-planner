@@ -22,4 +22,3 @@ keystore.properties
 *.keystore
 !debug.keystore
 .vscode/
-```

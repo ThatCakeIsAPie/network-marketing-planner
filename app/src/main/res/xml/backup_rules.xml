@@ -3,4 +3,3 @@
     <include domain="database" />
     <include domain="sharedpref" />
 </full-backup-content>
-```

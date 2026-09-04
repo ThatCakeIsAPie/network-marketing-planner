@@ -102,4 +102,3 @@ fun PlannerApp(container: AppContainer) {
         }
     }
 }
-```
