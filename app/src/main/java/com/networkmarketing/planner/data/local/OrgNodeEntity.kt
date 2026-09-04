@@ -24,4 +24,6 @@ data class OrgNodeEntity(
     val kind: String,
     val personalPv: Double,
     val personalBv: Double,
+    val canvasX: Float = 0f,
+    val canvasY: Float = 0f,
 )

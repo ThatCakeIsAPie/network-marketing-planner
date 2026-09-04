@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [MemberEntity::class, OrgNodeEntity::class, PrefsEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class PlannerDatabase : RoomDatabase() {

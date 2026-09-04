@@ -1,5 +1,6 @@
 package com.networkmarketing.planner.data.seed
 
+import com.networkmarketing.planner.domain.canvas.TreeLayout
 import com.networkmarketing.planner.domain.model.Member
 import com.networkmarketing.planner.domain.model.OrgNode
 import com.networkmarketing.planner.domain.model.OrgSnapshot
@@ -11,6 +12,7 @@ import java.util.UUID
  *
  * Current map is a developing team (no 25% legs; Group PV in the low 1,000s).
  * Ideal map is a six-leg Diamond-track snapshot: six 25% frontline, two with 25% depth.
+ * Both maps include canvas positions so Map/Plan open as a navigable node graph.
  */
 object SampleData {
     const val YOU_ID = "member-you"
@@ -18,7 +20,13 @@ object SampleData {
     fun snapshot(bvPerPv: Double): OrgSnapshot {
         val you = Member(id = YOU_ID, name = "You", notes = "Root of both maps", isYou = true)
         val currentPeople = listOf(
-            Member("m-alex", "Alex Rivera", "Strongest current leg"),
+            Member(
+                id = "m-alex",
+                name = "Alex Rivera",
+                notes = "Strongest current leg",
+                partnerName = "Chris Rivera",
+                isCouple = true,
+            ),
             Member("m-jordan", "Jordan Lee"),
             Member("m-sam", "Sam Patel"),
             Member("m-casey", "Casey Kim"),
@@ -64,7 +72,6 @@ object SampleData {
             node("n-priya", "m-priya", currentRoot.id, StructureKind.CURRENT, 85.0, bvPerPv),
         )
 
-        // Six 25% frontline legs (Diamond-track monthly snapshot); two have a 25% downline for Depth Bonus.
         val idealNodes = listOf(
             idealRoot,
             node("n-leg1", "m-leg1", idealRoot.id, StructureKind.IDEAL, 7_500.0, bvPerPv),
@@ -77,7 +84,10 @@ object SampleData {
             node("n-depth-b", "m-depth-b", "n-leg2", StructureKind.IDEAL, 7_500.0, bvPerPv),
         )
 
-        return OrgSnapshot(members = members, nodes = currentNodes + idealNodes)
+        val draft = OrgSnapshot(members = members, nodes = currentNodes + idealNodes)
+        val placed = TreeLayout.applyPositions(draft, StructureKind.CURRENT) +
+            TreeLayout.applyPositions(draft, StructureKind.IDEAL)
+        return draft.copy(nodes = placed)
     }
 
     fun node(
@@ -87,6 +97,8 @@ object SampleData {
         kind: StructureKind,
         personalPv: Double,
         bvPerPv: Double,
+        canvasX: Float = 0f,
+        canvasY: Float = 0f,
     ): OrgNode = OrgNode(
         id = id,
         memberId = memberId,
@@ -94,6 +106,8 @@ object SampleData {
         kind = kind,
         personalPv = personalPv,
         personalBv = personalPv * bvPerPv,
+        canvasX = canvasX,
+        canvasY = canvasY,
     )
 
     fun newId(prefix: String = "id"): String = "$prefix-${UUID.randomUUID().toString().take(8)}"

@@ -19,13 +19,19 @@ data class OrgSnapshot(
 
     fun nodes(kind: StructureKind): List<OrgNode> = nodes.filter { it.kind == kind }
 
-    fun root(kind: StructureKind): OrgNode? =
-        nodes(kind).firstOrNull { it.parentId == null }
+    fun root(kind: StructureKind): OrgNode? {
+        val ofKind = nodes(kind)
+        return ofKind.firstOrNull { isYou(it) } ?: ofKind.firstOrNull { it.parentId == null }
+    }
 
     fun children(nodeId: String): List<OrgNode> =
-        childrenByParent[nodeId].orEmpty().sortedBy { member(it.memberId)?.name.orEmpty() }
+        childrenByParent[nodeId].orEmpty().sortedWith(
+            compareBy<OrgNode> { it.canvasX }.thenBy { member(it.memberId)?.name.orEmpty() },
+        )
 
-    fun displayName(node: OrgNode): String = member(node.memberId)?.name ?: "Unknown"
+    fun displayName(node: OrgNode): String = member(node.memberId)?.displayName() ?: "Unknown"
+
+    fun isCouple(node: OrgNode): Boolean = member(node.memberId)?.isCouple == true
 
     fun isYou(node: OrgNode): Boolean = member(node.memberId)?.isYou == true
 

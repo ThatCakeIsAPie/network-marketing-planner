@@ -5,6 +5,9 @@ import com.networkmarketing.planner.data.local.OrgNodeEntity
 import com.networkmarketing.planner.data.local.PlannerDao
 import com.networkmarketing.planner.data.local.PrefsEntity
 import com.networkmarketing.planner.data.seed.SampleData
+import com.networkmarketing.planner.domain.canvas.CanvasMetrics
+import com.networkmarketing.planner.domain.canvas.LosGraph
+import com.networkmarketing.planner.domain.canvas.TreeLayout
 import com.networkmarketing.planner.domain.model.Member
 import com.networkmarketing.planner.domain.model.OrgNode
 import com.networkmarketing.planner.domain.model.OrgSnapshot
@@ -109,37 +112,106 @@ class PlannerRepository(
         personalPv: Double,
         bvPerPv: Double,
     ) {
+        val siblingCount = 0
+        addNode(
+            kind = parent.kind,
+            canvasX = parent.canvasX + siblingCount * (CanvasMetrics.NODE_WIDTH + CanvasMetrics.GAP_X),
+            canvasY = parent.canvasY + CanvasMetrics.NODE_HEIGHT + CanvasMetrics.GAP_Y,
+            parentId = parent.id,
+            name = name,
+            personalPv = personalPv,
+            bvPerPv = bvPerPv,
+        )
+    }
+
+    suspend fun addNode(
+        kind: StructureKind,
+        canvasX: Float,
+        canvasY: Float,
+        parentId: String?,
+        name: String,
+        personalPv: Double,
+        bvPerPv: Double,
+        partnerName: String = "",
+        isCouple: Boolean = false,
+    ): String {
         val memberId = SampleData.newId("member")
+        val nodeId = SampleData.newId("node")
         dao.upsertMember(
             MemberEntity(
                 id = memberId,
                 name = name.ifBlank { "New partner" },
                 notes = "",
                 isYou = false,
+                partnerName = partnerName,
+                isCouple = isCouple,
             ),
         )
         dao.upsertNode(
             OrgNodeEntity(
-                id = SampleData.newId("node"),
+                id = nodeId,
                 memberId = memberId,
-                parentId = parent.id,
-                kind = parent.kind.name,
+                parentId = parentId,
+                kind = kind.name,
                 personalPv = personalPv,
                 personalBv = personalPv * bvPerPv,
+                canvasX = canvasX,
+                canvasY = canvasY,
             ),
+        )
+        return nodeId
+    }
+
+    suspend fun savePerson(
+        node: OrgNode,
+        name: String,
+        partnerName: String,
+        isCouple: Boolean,
+        notes: String,
+        personalPv: Double,
+        personalBv: Double,
+    ) {
+        dao.upsertMember(
+            MemberEntity(
+                id = node.memberId,
+                name = name.ifBlank { "Unnamed" },
+                notes = notes,
+                isYou = node.memberId == SampleData.YOU_ID,
+                partnerName = partnerName,
+                isCouple = isCouple,
+            ),
+        )
+        dao.updateNode(
+            node.copy(personalPv = personalPv, personalBv = personalBv).toEntity(),
         )
     }
 
     suspend fun updateNodeVolume(node: OrgNode, personalPv: Double, personalBv: Double, name: String) {
-        dao.upsertMember(
-            MemberEntity(
-                id = node.memberId,
-                name = name,
-                notes = "",
-                isYou = node.memberId == SampleData.YOU_ID,
-            ),
+        savePerson(
+            node = node,
+            name = name,
+            partnerName = "",
+            isCouple = false,
+            notes = "",
+            personalPv = personalPv,
+            personalBv = personalBv,
         )
-        dao.updateNode(node.copy(personalPv = personalPv, personalBv = personalBv).toEntity())
+    }
+
+    suspend fun updatePosition(node: OrgNode, canvasX: Float, canvasY: Float) {
+        dao.updateNode(node.copy(canvasX = canvasX, canvasY = canvasY).toEntity())
+    }
+
+    suspend fun setParent(snapshot: OrgSnapshot, childId: String, parentId: String?): Boolean {
+        if (!LosGraph.canSetParent(snapshot, childId, parentId)) return false
+        val child = snapshot.node(childId) ?: return false
+        dao.updateNode(child.copy(parentId = parentId).toEntity())
+        return true
+    }
+
+    suspend fun applyLayout(snapshot: OrgSnapshot, kind: StructureKind) {
+        val placed = TreeLayout.applyPositions(snapshot, kind)
+        placed.forEach { dao.updateNode(it.toEntity()) }
     }
 
     suspend fun deleteSubtree(snapshot: OrgSnapshot, nodeId: String) {
@@ -153,11 +225,11 @@ class PlannerRepository(
     suspend fun copyCurrentToIdeal(snapshot: OrgSnapshot, bvPerPv: Double) {
         val mapping = mutableMapOf<String, String>()
         val rebuilt = topological(snapshot.nodes(StructureKind.CURRENT)).map { src ->
-            val newId = if (src.parentId == null) "n-you-ideal" else SampleData.newId("node")
+            val newId = if (snapshot.isYou(src)) "n-you-ideal" else SampleData.newId("node")
             mapping[src.id] = newId
             src.copy(
                 id = newId,
-                parentId = src.parentId?.let { mapping.getValue(it) },
+                parentId = src.parentId?.let { mapping[it] },
                 kind = StructureKind.IDEAL,
                 personalBv = src.personalPv * bvPerPv,
             )
@@ -170,11 +242,14 @@ class PlannerRepository(
 
     private fun topological(nodes: List<OrgNode>): List<OrgNode> {
         val byParent = nodes.groupBy { it.parentId }
+        val ids = nodes.map { it.id }.toSet()
         val result = mutableListOf<OrgNode>()
-        val roots = byParent[null].orEmpty()
+        val roots = nodes.filter { it.parentId == null || it.parentId !in ids }
         val queue = ArrayDeque(roots)
+        val seen = mutableSetOf<String>()
         while (queue.isNotEmpty()) {
             val n = queue.removeFirst()
+            if (!seen.add(n.id)) continue
             result += n
             queue.addAll(byParent[n.id].orEmpty())
         }
@@ -214,8 +289,8 @@ class PlannerRepository(
     )
 }
 
-private fun MemberEntity.toModel() = Member(id, name, notes, isYou)
-private fun Member.toEntity() = MemberEntity(id, name, notes, isYou)
+private fun MemberEntity.toModel() = Member(id, name, notes, isYou, partnerName, isCouple)
+private fun Member.toEntity() = MemberEntity(id, name, notes, isYou, partnerName, isCouple)
 
 private fun OrgNodeEntity.toModel() = OrgNode(
     id = id,
@@ -224,6 +299,8 @@ private fun OrgNodeEntity.toModel() = OrgNode(
     kind = StructureKind.valueOf(kind),
     personalPv = personalPv,
     personalBv = personalBv,
+    canvasX = canvasX,
+    canvasY = canvasY,
 )
 
 private fun OrgNode.toEntity() = OrgNodeEntity(
@@ -233,6 +310,8 @@ private fun OrgNode.toEntity() = OrgNodeEntity(
     kind = kind.name,
     personalPv = personalPv,
     personalBv = personalBv,
+    canvasX = canvasX,
+    canvasY = canvasY,
 )
 
 private fun PrefsEntity.toGoals() = UserGoals(

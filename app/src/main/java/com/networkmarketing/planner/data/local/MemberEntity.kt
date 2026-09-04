@@ -9,4 +9,6 @@ data class MemberEntity(
     val name: String,
     val notes: String,
     val isYou: Boolean,
+    val partnerName: String = "",
+    val isCouple: Boolean = false,
 )

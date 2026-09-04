@@ -16,8 +16,8 @@ This project is **not affiliated with, endorsed by, or sponsored by** any networ
 
 | Tab | Purpose |
 | --- | --- |
-| **Map** | Current organization tree/chart with personal, Group (pass-up), Ruby/Side, and team PV. Sample team is seeded on first launch. |
-| **Plan** | Ideal/target structure. Compare current vs ideal and see gap suggestions, including Silver Producer Q-month paths. |
+| **Map** | Infinite 20 dp grid canvas (pan, pinch / +− zoom, Fit, 100%). IBO nodes with single/couple names, PV/BV, top **upline** and bottom **downline** docks. Drag dock-to-dock to set Line of Sponsorship. Positions persist in Room. |
+| **Plan** | Same node canvas for the ideal structure, plus gap vs the current map. |
 | **Calculator** | PV/BV inputs (or “use current org”), Core Plan payout lines, Plus/Elite, Rule 4.12 factor, rank progress. |
 | **Goals** | Income/rank goals, retail 10/15/20%, Rule 4.12 / VCS, YTD Q/PQ counters, bonus toggles, full assumption list. |
 
@@ -27,9 +27,20 @@ Onboarding asks you to accept the unofficial-tool disclaimer and set a first inc
 
 Extensible types live under `app/src/main/java/com/networkmarketing/planner/domain`:
 
-- `Member` — a person
-- `OrgNode` — that person placed in `CURRENT` or `IDEAL` with monthly personal PV/BV
+- `Member` — a person or couple (`isCouple`, `partnerName`)
+- `OrgNode` — that person placed in `CURRENT` or `IDEAL` with monthly personal PV/BV and canvas `x/y`
 - `OrgSnapshot` — members + nodes; **team volume** is personal + all descendants
+- `LosGraph` / `ElbowPath` / `TreeLayout` — Line of Sponsorship wiring, Faleth-style mid-X elbows, auto-layout
+
+## Using the Map canvas
+
+1. **Pan** by dragging empty grid. **Zoom** with pinch or the + / − / 100% / Fit controls (0.25×–2.0×).
+2. **Move** a person by dragging the card; positions snap to the 20 dp grid and save locally.
+3. **LOS:** drag the **top dock** (upline) or a **bottom dock** (one port per frontline plus a vacant add port) to another dock. One edge per port; reconnecting replaces the old link. Drop a vacant bottom dock on empty grid to add a downline.
+4. **Tap** a node for the inspector: single vs couple, names, PV, BV (default PV × 3.43), notes, detach, delete.
+5. Sample data opens as a positioned graph, including one couple (Alex & Chris).
+
+The canvas mirrors the Faleth CRM workspace *feel* (custom grid, pan/zoom, port wiring, orthogonal mid-X elbows). Faleth’s left/right workflow ports and ticket/point semantics are **not** used — this graph is Line of Sponsorship for people and AmwayNA_PY2027 volume. The Faleth repo was not readable from this environment; behavior follows the documented TemplateGraphEditor pattern.
 - `UserGoals` / `PlannerSettings` — income/rank targets, Rule 4.12, YTD pin counters
 - `CompensationConfig` (`AmwayNA_PY2027`) + `CompensationEngine` + `LeadershipBonus` — **the only place payout math should change**
 

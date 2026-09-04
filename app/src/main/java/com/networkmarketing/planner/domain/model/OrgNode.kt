@@ -6,10 +6,11 @@ enum class StructureKind {
 }
 
 /**
- * One placement of a [Member] in either the current or ideal organization tree.
+ * One placement of a [Member] in either the current or ideal organization.
  *
- * Volume is monthly personal PV/BV (own + registered customer volume).
- * Group volume is derived by rolling up descendants — see [OrgSnapshot].
+ * Volume is monthly personal PV/BV. Line of Sponsorship is [parentId]
+ * (upline). [canvasX] / [canvasY] are persisted world-space positions in dp
+ * for the Map / Plan node canvas.
  */
 data class OrgNode(
     val id: String,
@@ -18,4 +19,6 @@ data class OrgNode(
     val kind: StructureKind,
     val personalPv: Double,
     val personalBv: Double,
+    val canvasX: Float = 0f,
+    val canvasY: Float = 0f,
 )

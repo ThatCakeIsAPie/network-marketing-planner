@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.networkmarketing.planner.data.repository.PlannerRepository
+import com.networkmarketing.planner.domain.canvas.CanvasMetrics
+import com.networkmarketing.planner.domain.canvas.LosGraph
 import com.networkmarketing.planner.domain.compensation.CompensationEngine
 import com.networkmarketing.planner.domain.compensation.FrontlineVolume
 import com.networkmarketing.planner.domain.compensation.GapAnalyzer
@@ -35,6 +37,8 @@ data class PlannerUiState(
     val calculatorGroupPv: String = "1500",
     val calculatorMaxLegs: String = "0",
     val calculatorUseOrg: Boolean = true,
+    val currentPayouts: Map<String, PayoutBreakdown> = emptyMap(),
+    val idealPayouts: Map<String, PayoutBreakdown> = emptyMap(),
 )
 
 class PlannerViewModel(
@@ -66,6 +70,8 @@ class PlannerViewModel(
             calculatorGroupPv = calc.groupPv,
             calculatorMaxLegs = calc.maxLegs,
             calculatorUseOrg = calc.useOrg,
+            currentPayouts = payoutsFor(snapshot, StructureKind.CURRENT, settings),
+            idealPayouts = payoutsFor(snapshot, StructureKind.IDEAL, settings),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlannerUiState())
 
@@ -107,14 +113,88 @@ class PlannerViewModel(
 
     fun addChild(parent: OrgNode, name: String, personalPv: Double) {
         viewModelScope.launch {
-            repository.addChild(parent, name, personalPv, uiState.value.settings.bvPerPv)
+            val kids = uiState.value.snapshot.children(parent.id).size
+            val pos = CanvasMetrics.snapPoint(
+                parent.canvasX + kids * (CanvasMetrics.NODE_WIDTH + CanvasMetrics.GAP_X),
+                parent.canvasY + CanvasMetrics.nodeHeight(uiState.value.snapshot.isCouple(parent)) +
+                    CanvasMetrics.GAP_Y,
+            )
+            repository.addNode(
+                kind = parent.kind,
+                canvasX = pos.first,
+                canvasY = pos.second,
+                parentId = parent.id,
+                name = name,
+                personalPv = personalPv,
+                bvPerPv = uiState.value.settings.bvPerPv,
+            )
+        }
+    }
+
+    fun addNodeAt(kind: StructureKind, x: Float, y: Float, parent: OrgNode? = null, name: String = "New partner") {
+        viewModelScope.launch {
+            val pos = CanvasMetrics.snapPoint(x, y)
+            val id = repository.addNode(
+                kind = kind,
+                canvasX = pos.first,
+                canvasY = pos.second,
+                parentId = parent?.id,
+                name = name,
+                personalPv = 100.0,
+                bvPerPv = uiState.value.settings.bvPerPv,
+            )
+            selectNode(id)
         }
     }
 
     fun saveNode(node: OrgNode, name: String, personalPv: Double) {
         viewModelScope.launch {
+            val member = uiState.value.snapshot.member(node.memberId)
             val bv = personalPv * uiState.value.settings.bvPerPv
-            repository.updateNodeVolume(node, personalPv, bv, name)
+            repository.savePerson(
+                node = node,
+                name = name,
+                partnerName = member?.partnerName.orEmpty(),
+                isCouple = member?.isCouple == true,
+                notes = member?.notes.orEmpty(),
+                personalPv = personalPv,
+                personalBv = bv,
+            )
+        }
+    }
+
+    fun savePerson(
+        node: OrgNode,
+        name: String,
+        partnerName: String,
+        isCouple: Boolean,
+        notes: String,
+        personalPv: Double,
+        personalBv: Double,
+    ) {
+        viewModelScope.launch {
+            repository.savePerson(node, name, partnerName, isCouple, notes, personalPv, personalBv)
+        }
+    }
+
+    fun moveNode(node: OrgNode, x: Float, y: Float) {
+        viewModelScope.launch {
+            val snapped = CanvasMetrics.snapPoint(x, y)
+            repository.updatePosition(node, snapped.first, snapped.second)
+        }
+    }
+
+    fun applyLosEdit(edit: LosGraph.ConnectionEdit) {
+        viewModelScope.launch {
+            val snapshot = uiState.value.snapshot
+            edit.detachId?.let { repository.setParent(snapshot, it, null) }
+            repository.setParent(uiState.value.snapshot, edit.childId, edit.newParentId)
+        }
+    }
+
+    fun applyLayout(kind: StructureKind) {
+        viewModelScope.launch {
+            repository.applyLayout(uiState.value.snapshot, kind)
         }
     }
 
@@ -177,6 +257,13 @@ class PlannerViewModel(
     fun engine(): CompensationEngine = engine
 
     fun youNode(kind: StructureKind): OrgNode? = uiState.value.snapshot.root(kind)
+
+    private fun payoutsFor(
+        snapshot: OrgSnapshot,
+        kind: StructureKind,
+        settings: PlannerSettings,
+    ): Map<String, PayoutBreakdown> =
+        snapshot.nodes(kind).associate { it.id to engine.evaluateNode(snapshot, it.id, settings) }
 
     companion object {
         fun factory(
