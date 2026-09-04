@@ -1,5 +1,11 @@
 {
-  "name": "Network Marketing Planner (Android)",
+  "name": "Network Marketing Planner (Android + server)",
   "user": "ubuntu",
-  "install": "bash .cursor/install.sh"
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "planner-server",
+      "command": "./gradlew :server:run"
+    }
+  ]
 }

@@ -2,7 +2,7 @@
 
 Open-source **Android** planner for network marketers. Map a current organization, sketch an ideal structure, and estimate what PV/BV-style volume it takes to reach an income or rank goal.
 
-This is a **local-first** v1: data stays on the device (Room). There is no account system and no company API.
+It runs three ways from **one shared codebase**: the **Android app** (smoothest experience), a **browser** version on desktop, and the same page on a **phone browser**. A small self-hosted **server** holds the data and does the payout math, so every client reads and writes the same organization. The app also works **fully offline on-device** (Room) when no server is configured.
 
 **Display name:** Network Marketing Planner  
 **Application ID:** `com.networkmarketing.planner`  
@@ -23,9 +23,31 @@ This project is **not affiliated with, endorsed by, or sponsored by** any networ
 
 Onboarding asks you to accept the unofficial-tool disclaimer and set a first income/rank goal.
 
+## Architecture (shared core, three clients)
+
+The project is a Gradle multi-module build so the organization model and the payout engine are written **once** and reused everywhere:
+
+| Module | What it is |
+| --- | --- |
+| `:shared` | Pure-Kotlin/JVM core: domain models, the `AmwayNaPy2027` compensation engine, LOS/tree layout, sample data, and `SnapshotOps` edits. Serializable so it travels over the wire. |
+| `:server` | [Ktor](https://ktor.io) server. Holds the single source of truth (`PlannerState` in a JSON file), exposes a REST API that reuses the `:shared` engine, and serves the browser app. |
+| `:app` | The Android app. Uses `:shared` for all math and can talk to `:server` through a Ktor client. |
+
+The **server is the source of truth**. The browser app calls its REST API directly; the Android app reads/writes the same API (mirroring responses into the reactive UI) or, with no server configured, keeps everything on-device in Room.
+
+## Browser version & shared server
+
+Run the server (see below) and open `http://localhost:8080`. The browser app has the same **Map / Plan / Calculator / Goals** tabs, an SVG org tree with a node inspector, and live payout cards — usable from a desktop or phone browser.
+
+To point the **Android app** at a server, open **Goals → Sync**, enter the server URL, and tap **Connect & sync** (from the emulator the host is `http://10.0.2.2:8080`). You can also bake a default in at build time with `-PplannerServerUrl=<url>`. Edits made in any client show up in the others on next load.
+
+### REST API (selected)
+
+`GET /api/state`, `PUT /api/goals`, `PUT /api/settings`, `POST /api/nodes`, `PUT /api/nodes/{id}`, `POST /api/nodes/{id}/move`, `POST /api/nodes/{id}/reparent`, `DELETE /api/nodes/{id}`, `POST /api/layout?kind=CURRENT|IDEAL`, `POST /api/sample-data`, `GET /api/calculator?kind=…`, `GET /api/gap`, `GET /api/config`.
+
 ## Domain model
 
-Extensible types live under `app/src/main/java/com/networkmarketing/planner/domain`:
+Extensible types live under `shared/src/main/kotlin/com/networkmarketing/planner/domain`:
 
 - `Member` — a person or couple (`isCouple`, `partnerName`)
 - `OrgNode` — that person placed in `CURRENT` or `IDEAL` with monthly personal PV/BV and canvas `x/y`
@@ -97,8 +119,18 @@ Debug APK path: `app/build/outputs/apk/debug/app-debug.apk`
 Unit tests for the engine (no emulator):
 
 ```bash
-./gradlew testDebugUnitTest
+./gradlew :shared:test        # domain + compensation engine (31 tests)
+./gradlew :server:test        # REST API behavior
+./gradlew testDebugUnitTest   # app-level tests
 ```
+
+### Run the server + browser app
+
+```bash
+./gradlew :server:run         # serves the API and web app on http://localhost:8080
+```
+
+Data persists to `planner-data.json` (override with `PLANNER_DATA_FILE`; port with `PLANNER_PORT`).
 
 If `ANDROID_HOME` / `ANDROID_SDK_ROOT` is unset, create `local.properties` with:
 
@@ -110,7 +142,7 @@ sdk.dir=/path/to/Android/sdk
 
 ## Out of scope (v1)
 
-Company APIs, iOS, accounts/cloud sync, and Play Store publishing.
+Company APIs, iOS, hosted multi-user accounts (the shared server is single-tenant and self-hosted, with no auth yet), real-time push between clients (changes appear on next load), and Play Store publishing.
 
 ## License
 

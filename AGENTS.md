@@ -4,24 +4,46 @@ Guidance for AI coding agents working on the **Network Marketing Planner** Andro
 
 ## Project at a glance
 
-- Android app: Kotlin + Jetpack Compose + Room, built with Gradle (wrapper pinned to Gradle 8.9).
-- Requirements: JDK 17+ (21 is fine) and Android SDK 35 (`compileSdk`/`targetSdk` 35, `minSdk` 26).
-- Application ID: `com.networkmarketing.planner`.
-- All payout/compensation math lives under `app/src/main/java/com/networkmarketing/planner/domain/compensation` (`AmwayNaPy2027.kt`, `CompensationEngine.kt`, `LeadershipBonus.kt`). Change payout behavior only there.
-- Persistence is Room (`data/local`) behind `PlannerRepository`.
+Gradle multi-module build (wrapper pinned to Gradle 8.9); JDK 17+ (21 is fine).
+
+- `:shared` — pure-Kotlin/JVM core reused by every client: domain models, the
+  `AmwayNaPy2027` compensation engine, LOS/tree layout, sample data, and `SnapshotOps`.
+  Models are `@Serializable`. **All payout/compensation math lives here** — change payout
+  behavior only in `shared/.../domain/compensation` (`AmwayNaPy2027.kt`,
+  `CompensationEngine.kt`, `LeadershipBonus.kt`).
+- `:server` — Ktor server (`server/.../server/Application.kt`). Single source of truth
+  (`PlannerState` in a JSON file via `StateStore`), REST API reusing the `:shared` engine,
+  and serves the browser app from `server/src/main/resources/web`.
+- `:app` — Android app (Compose, Android SDK 35, `minSdk` 26, appId `com.networkmarketing.planner`).
+  UI depends on the `PlannerStore` interface; `PlannerRepository` is the Room (on-device)
+  impl and `RemotePlannerRepository` (Ktor client) reads/writes `:server`. Server selection
+  is in `ServerPreferences` (build default `-PplannerServerUrl=...`, runtime override on the
+  Goals → Sync card).
 
 ## Build and test
 
 Run from the repo root:
 
 ```bash
+./gradlew :shared:test         # domain + compensation engine (fastest high-signal check)
+./gradlew :server:test         # REST API behavior (Ktor test host)
 ./gradlew assembleDebug        # debug APK -> app/build/outputs/apk/debug/app-debug.apk
-./gradlew testDebugUnitTest    # JVM unit tests (no emulator needed)
+./gradlew testDebugUnitTest    # app-level tests
 ```
 
-The unit tests cover the compensation engine and the LOS graph, so they are the fastest
-high-signal check for changes to domain/engine logic. Prefer them over an emulator when a
-change does not touch UI.
+Prefer `:shared:test` for domain/engine changes (no emulator needed). When editing payout
+math, update it in `:shared` and it flows to the app, server, and browser at once.
+
+## Server + browser app
+
+```bash
+./gradlew :server:run          # API + web app on http://localhost:8080
+```
+
+Test the browser app by opening `http://localhost:8080` (Map/Plan/Calculator/Goals). To test
+the Android app against it, build with `-PplannerServerUrl=http://10.0.2.2:8080` (emulator →
+host) or set the URL at runtime on the Goals → Sync card, then install and launch. The server
+data file is `planner-data.json` (override `PLANNER_DATA_FILE` / `PLANNER_PORT`).
 
 ## Cursor Cloud specific instructions
 
