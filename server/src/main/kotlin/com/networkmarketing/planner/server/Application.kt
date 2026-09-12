@@ -105,6 +105,7 @@ private fun io.ktor.server.routing.Routing.plannerApi(
                 bvPerPv = current.settings.bvPerPv,
                 partnerName = body.partnerName,
                 isCouple = body.isCouple,
+                planProfileId = body.planProfileId,
             )
             newId = id
             current.copy(snapshot = snapshot)
@@ -158,7 +159,12 @@ private fun io.ktor.server.routing.Routing.plannerApi(
 
     post("/api/layout") {
         val kind = call.kindParam()
-        call.respond(store.update { it.copy(snapshot = SnapshotOps.applyLayout(it.snapshot, kind)) })
+        val profileId = call.request.queryParameters["planProfileId"]
+        call.respond(
+            store.update {
+                it.copy(snapshot = SnapshotOps.applyLayout(it.snapshot, kind, profileId))
+            },
+        )
     }
 
     post("/api/sample-data") {
@@ -169,11 +175,68 @@ private fun io.ktor.server.routing.Routing.plannerApi(
         call.respond(store.update { it.copy(snapshot = SnapshotOps.copyCurrentToIdeal(it.snapshot, it.settings.bvPerPv)) })
     }
 
+    post("/api/copy-current-to-plan") {
+        val body = call.receive<CopyToPlanRequest>()
+        call.respond(
+            store.update {
+                it.copy(
+                    snapshot = SnapshotOps.copyCurrentToPlan(it.snapshot, body.planProfileId, it.settings.bvPerPv),
+                )
+            },
+        )
+    }
+
+    post("/api/plan-profiles") {
+        val body = call.receive<PlanProfileRequest>()
+        var newId = ""
+        val state = store.update { current ->
+            val (snapshot, id) = SnapshotOps.createPlanProfile(
+                current.snapshot,
+                body.name,
+                current.settings.bvPerPv,
+            )
+            newId = id
+            current.copy(snapshot = snapshot)
+        }
+        call.respond(HttpStatusCode.Created, CreatePlanProfileResponse(newId, state))
+    }
+
+    put("/api/plan-profiles/{id}") {
+        val id = call.parameters["id"] ?: return@put call.respond(HttpStatusCode.BadRequest, ErrorResponse("Missing id"))
+        val body = call.receive<PlanProfileRequest>()
+        call.respond(
+            store.update { it.copy(snapshot = SnapshotOps.renamePlanProfile(it.snapshot, id, body.name)) },
+        )
+    }
+
+    delete("/api/plan-profiles/{id}") {
+        val id = call.parameters["id"] ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Missing id"))
+        call.respond(
+            store.update { it.copy(snapshot = SnapshotOps.deletePlanProfile(it.snapshot, id)) },
+        )
+    }
+
+    post("/api/claims") {
+        val body = call.receive<ClaimRequest>()
+        val current = store.read()
+        val updated = SnapshotOps.claimPlanSlot(current.snapshot, body.currentNodeId, body.planNodeId)
+            ?: return@post call.respond(HttpStatusCode.Conflict, ErrorResponse("Invalid claim"))
+        call.respond(store.update { it.copy(snapshot = updated) })
+    }
+
+    delete("/api/claims/{currentNodeId}") {
+        val id = call.parameters["currentNodeId"]
+            ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Missing id"))
+        call.respond(store.update { it.copy(snapshot = SnapshotOps.unclaimPlanSlot(it.snapshot, id)) })
+    }
+
     get("/api/calculator") {
         val kind = call.kindParam()
+        val profileId = call.request.queryParameters["planProfileId"]
         val state = store.read()
-        val root = engine.evaluateRoot(state.snapshot, kind, state.settings)
-        val perNode = state.snapshot.nodes(kind).associate { it.id to engine.evaluateNode(state.snapshot, it.id, state.settings) }
+        val root = engine.evaluateRoot(state.snapshot, kind, state.settings, profileId)
+        val perNode = state.snapshot.nodes(kind, profileId)
+            .associate { it.id to engine.evaluateNode(state.snapshot, it.id, state.settings) }
         call.respond(CalculatorResponse(kind = kind, root = root, perNode = perNode))
     }
 

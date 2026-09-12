@@ -4,13 +4,20 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
 /**
- * In-memory view of members plus current/ideal tree nodes.
+ * In-memory view of members plus current/plan tree nodes.
  * Group volume is personal volume plus all descendants in the same structure.
+ *
+ * Ideal nodes are partitioned by [PlanProfile] ([OrgNode.planProfileId]).
+ * [planClaims] maps a current (Map) node id → a plan-profile node id when the
+ * user claims a ghost slot on the Map.
  */
 @Serializable
 data class OrgSnapshot(
     val members: List<Member> = emptyList(),
     val nodes: List<OrgNode> = emptyList(),
+    val planProfiles: List<PlanProfile> = emptyList(),
+    /** currentNodeId → planNodeId */
+    val planClaims: Map<String, String> = emptyMap(),
 ) {
     @Transient
     private val membersById: Map<String, Member> = members.associateBy { it.id }
@@ -26,10 +33,29 @@ data class OrgSnapshot(
 
     fun node(id: String): OrgNode? = nodesById[id]
 
+    fun primaryPlanProfileId(): String =
+        planProfiles.firstOrNull()?.id ?: PlanProfile.DEFAULT_ID
+
+    fun planProfile(id: String): PlanProfile? = planProfiles.firstOrNull { it.id == id }
+
+    /** Ideal nodes for one plan profile (after normalization, [planProfileId] is set). */
+    fun planNodes(profileId: String): List<OrgNode> =
+        nodes.filter {
+            it.kind == StructureKind.IDEAL && it.effectivePlanProfileId() == profileId
+        }
+
     fun nodes(kind: StructureKind): List<OrgNode> = nodes.filter { it.kind == kind }
 
-    fun root(kind: StructureKind): OrgNode? {
-        val ofKind = nodes(kind)
+    fun nodes(kind: StructureKind, planProfileId: String?): List<OrgNode> =
+        when {
+            kind == StructureKind.IDEAL && planProfileId != null -> planNodes(planProfileId)
+            else -> nodes(kind)
+        }
+
+    fun root(kind: StructureKind): OrgNode? = root(kind, planProfileId = null)
+
+    fun root(kind: StructureKind, planProfileId: String?): OrgNode? {
+        val ofKind = nodes(kind, planProfileId)
         return ofKind.firstOrNull { isYou(it) } ?: ofKind.firstOrNull { it.parentId == null }
     }
 
@@ -81,6 +107,9 @@ data class OrgSnapshot(
 
     fun nodeCount(kind: StructureKind): Int = nodes(kind).size
 
+    fun nodeCount(kind: StructureKind, planProfileId: String?): Int =
+        nodes(kind, planProfileId).size
+
     fun generations(kind: StructureKind): List<List<OrgNode>> {
         val root = root(kind) ?: return emptyList()
         val rows = mutableListOf<List<OrgNode>>()
@@ -92,5 +121,48 @@ data class OrgSnapshot(
             layer = layer.flatMap { children(it.id) }.filter { it.id !in seen }
         }
         return rows
+    }
+
+    /** Plan node claimed by this current node, if any. */
+    fun claimedPlanNode(currentNodeId: String): OrgNode? =
+        planClaims[currentNodeId]?.let { nodesById[it] }
+
+    /** Current node that claimed this plan slot, if any. */
+    fun claimerOfPlanNode(planNodeId: String): OrgNode? {
+        val currentId = planClaims.entries.firstOrNull { it.value == planNodeId }?.key ?: return null
+        return nodesById[currentId]
+    }
+
+    /**
+     * Ensures at least one plan profile exists and Ideal nodes carry a profile id.
+     * Legacy snapshots (Ideal-only, no profiles) become a single "Ideal" profile.
+     */
+    fun withNormalizedPlans(): OrgSnapshot {
+        val profiles = if (planProfiles.isEmpty()) {
+            listOf(PlanProfile.default())
+        } else {
+            planProfiles
+        }
+        val defaultId = profiles.first().id
+        val normalizedNodes = nodes.map { node ->
+            when {
+                node.kind == StructureKind.IDEAL && node.planProfileId == null ->
+                    node.copy(planProfileId = defaultId)
+                node.kind == StructureKind.CURRENT ->
+                    node.copy(planProfileId = null)
+                else -> node
+            }
+        }
+        val ids = normalizedNodes.map { it.id }.toSet()
+        val cleanedClaims = planClaims.filter { (currentId, planId) ->
+            currentId in ids && planId in ids &&
+                normalizedNodes.find { it.id == currentId }?.kind == StructureKind.CURRENT &&
+                normalizedNodes.find { it.id == planId }?.kind == StructureKind.IDEAL
+        }
+        return copy(
+            nodes = normalizedNodes,
+            planProfiles = profiles,
+            planClaims = cleanedClaims,
+        )
     }
 }

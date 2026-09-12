@@ -3,9 +3,11 @@ package com.networkmarketing.planner.ui.goals
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -80,7 +82,14 @@ fun GoalsScreen(
         mutableStateOf(state.settings.newIboBaselineMonths.toString())
     }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Goals & settings") }) }) { padding ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Goals & settings") },
+                actions = { Spacer(Modifier.width(48.dp)) },
+            )
+        },
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()

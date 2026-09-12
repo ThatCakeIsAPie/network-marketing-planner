@@ -16,8 +16,8 @@ This project is **not affiliated with, endorsed by, or sponsored by** any networ
 
 | Tab | Purpose |
 | --- | --- |
-| **Map** | Infinite 20 dp grid canvas (pan, pinch / +− zoom, Fit, 100%). Circular IBO nodes (name · PV · $) with straight arrow edges for Line of Sponsorship. Drag a node onto another to set upline; dwell on empty to detach. Positions persist in Room. |
-| **Plan** | Same node canvas for the ideal structure, plus gap vs the current map. |
+| **Map** | Infinite 20 dp grid canvas (pan, pinch / +− zoom, Fit, 100%). Circular IBO nodes (name · PV · $) with straight arrow edges for Line of Sponsorship. Hold over another node to set upline; hold over current upline to detach. Positions persist in Room. |
+| **Plan** | Same node canvas for named **plan profiles** (Ideal, Emerald, custom targets…), plus gap vs the current map. |
 | **Calculator** | PV/BV inputs (or “use current org”), Core Plan payout lines, Plus/Elite, Rule 4.12 factor, rank progress. |
 | **Goals** | Income/rank goals, retail 10/15/20%, Rule 4.12 / VCS, YTD Q/PQ counters, bonus toggles, full assumption list. |
 
@@ -50,15 +50,16 @@ To point the **Android app** at a server, open **Goals → Sync**, enter the ser
 Extensible types live under `shared/src/main/kotlin/com/networkmarketing/planner/domain`:
 
 - `Member` — a person or couple (`isCouple`, `partnerName`)
-- `OrgNode` — that person placed in `CURRENT` or `IDEAL` with monthly personal PV/BV and canvas `x/y`
-- `OrgSnapshot` — members + nodes; **team volume** is personal + all descendants
+- `OrgNode` — that person placed in `CURRENT` or a plan profile (`IDEAL` + `planProfileId`) with monthly personal PV/BV and canvas `x/y`
+- `OrgSnapshot` — members + nodes + `planProfiles` + `planClaims` (Map current→plan); **team volume** is personal + all descendants
+- `PlanProfile` — named planned org (replaces single Ideal); Map can overlay a profile as ghosts and claim slots via hold-to-attach
 - `LosGraph` / `ElbowPath` / `TreeLayout` — Line of Sponsorship wiring, straight arrow edges, auto-layout (circle centers)
 
 ## Using the Map canvas
 
 1. **Pan** with two fingers (or empty-grid marquee select with one finger). **Zoom** with pinch or the + / − / 100% / Fit controls (0.25×–2.0×).
 2. **Move** a person by dragging their circle; positions snap to the 20 dp grid and save locally.
-3. **LOS:** drag a circle onto another to make it **downline** of the target. Hold a downline over empty canvas (~400 ms) until “Release to detach” appears, then release. Sheet still has Add downline / Detach.
+3. **LOS:** hold a circle over another for about a second to make it **downline** of the target. Hold it over its **current upline** to detach. Sheet also has Add downline / Detach.
 4. **Tap** a node for the inspector: single vs couple, names, PV, VCS PV, BV, notes, detach, delete.
 5. Sample data opens as a positioned graph, including one couple (Alex & Chris).
 

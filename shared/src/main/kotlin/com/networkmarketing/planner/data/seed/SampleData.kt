@@ -4,6 +4,7 @@ import com.networkmarketing.planner.domain.canvas.TreeLayout
 import com.networkmarketing.planner.domain.model.Member
 import com.networkmarketing.planner.domain.model.OrgNode
 import com.networkmarketing.planner.domain.model.OrgSnapshot
+import com.networkmarketing.planner.domain.model.PlanProfile
 import com.networkmarketing.planner.domain.model.StructureKind
 import java.util.UUID
 
@@ -11,13 +12,14 @@ import java.util.UUID
  * Demo organization so the app is useful on first launch.
  *
  * Current map is a developing team (no 25% legs; Group PV in the low 1,000s).
- * Ideal map is a six-leg Diamond-track snapshot: six 25% frontline, two with 25% depth.
+ * Default Ideal plan is a six-leg Diamond-track snapshot: six 25% frontline, two with 25% depth.
  * Both maps include canvas positions so Map/Plan open as a navigable node graph.
  */
 object SampleData {
     const val YOU_ID = "member-you"
 
     fun snapshot(bvPerPv: Double): OrgSnapshot {
+        val defaultPlan = PlanProfile.default()
         val you = Member(id = YOU_ID, name = "You", notes = "Root of both maps", isYou = true)
         val currentPeople = listOf(
             Member(
@@ -53,7 +55,10 @@ object SampleData {
         val members = listOf(you) + currentPeople + idealPeople
 
         val currentRoot = node("n-you-current", YOU_ID, null, StructureKind.CURRENT, 220.0, bvPerPv)
-        val idealRoot = node("n-you-ideal", YOU_ID, null, StructureKind.IDEAL, 250.0, bvPerPv)
+        val idealRoot = node(
+            "n-you-ideal", YOU_ID, null, StructureKind.IDEAL, 250.0, bvPerPv,
+            planProfileId = defaultPlan.id,
+        )
 
         val currentNodes = listOf(
             currentRoot,
@@ -74,20 +79,24 @@ object SampleData {
 
         val idealNodes = listOf(
             idealRoot,
-            node("n-leg1", "m-leg1", idealRoot.id, StructureKind.IDEAL, 7_500.0, bvPerPv),
-            node("n-leg2", "m-leg2", idealRoot.id, StructureKind.IDEAL, 7_500.0, bvPerPv),
-            node("n-leg3", "m-leg3", idealRoot.id, StructureKind.IDEAL, 7_500.0, bvPerPv),
-            node("n-leg4", "m-leg4", idealRoot.id, StructureKind.IDEAL, 7_500.0, bvPerPv),
-            node("n-leg5", "m-leg5", idealRoot.id, StructureKind.IDEAL, 7_500.0, bvPerPv),
-            node("n-leg6", "m-leg6", idealRoot.id, StructureKind.IDEAL, 7_500.0, bvPerPv),
-            node("n-depth-a", "m-depth-a", "n-leg1", StructureKind.IDEAL, 7_500.0, bvPerPv),
-            node("n-depth-b", "m-depth-b", "n-leg2", StructureKind.IDEAL, 7_500.0, bvPerPv),
+            node("n-leg1", "m-leg1", idealRoot.id, StructureKind.IDEAL, 7_500.0, bvPerPv, planProfileId = defaultPlan.id),
+            node("n-leg2", "m-leg2", idealRoot.id, StructureKind.IDEAL, 7_500.0, bvPerPv, planProfileId = defaultPlan.id),
+            node("n-leg3", "m-leg3", idealRoot.id, StructureKind.IDEAL, 7_500.0, bvPerPv, planProfileId = defaultPlan.id),
+            node("n-leg4", "m-leg4", idealRoot.id, StructureKind.IDEAL, 7_500.0, bvPerPv, planProfileId = defaultPlan.id),
+            node("n-leg5", "m-leg5", idealRoot.id, StructureKind.IDEAL, 7_500.0, bvPerPv, planProfileId = defaultPlan.id),
+            node("n-leg6", "m-leg6", idealRoot.id, StructureKind.IDEAL, 7_500.0, bvPerPv, planProfileId = defaultPlan.id),
+            node("n-depth-a", "m-depth-a", "n-leg1", StructureKind.IDEAL, 7_500.0, bvPerPv, planProfileId = defaultPlan.id),
+            node("n-depth-b", "m-depth-b", "n-leg2", StructureKind.IDEAL, 7_500.0, bvPerPv, planProfileId = defaultPlan.id),
         )
 
-        val draft = OrgSnapshot(members = members, nodes = currentNodes + idealNodes)
+        val draft = OrgSnapshot(
+            members = members,
+            nodes = currentNodes + idealNodes,
+            planProfiles = listOf(defaultPlan),
+        )
         val placed = TreeLayout.applyPositions(draft, StructureKind.CURRENT) +
-            TreeLayout.applyPositions(draft, StructureKind.IDEAL)
-        return draft.copy(nodes = placed)
+            TreeLayout.applyPositions(draft, StructureKind.IDEAL, defaultPlan.id)
+        return draft.copy(nodes = placed).withNormalizedPlans()
     }
 
     fun node(
@@ -99,6 +108,7 @@ object SampleData {
         bvPerPv: Double,
         canvasX: Float = 0f,
         canvasY: Float = 0f,
+        planProfileId: String? = null,
     ): OrgNode = OrgNode(
         id = id,
         memberId = memberId,
@@ -108,6 +118,7 @@ object SampleData {
         personalBv = personalPv * bvPerPv,
         canvasX = canvasX,
         canvasY = canvasY,
+        planProfileId = planProfileId,
     )
 
     fun newId(prefix: String = "id"): String = "$prefix-${UUID.randomUUID().toString().take(8)}"

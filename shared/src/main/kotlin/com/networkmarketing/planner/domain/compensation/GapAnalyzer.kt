@@ -27,9 +27,12 @@ class GapAnalyzer(
         snapshot: OrgSnapshot,
         settings: PlannerSettings,
         goals: UserGoals,
+        planProfileId: String? = null,
     ): StructureGap? {
-        val current = engine.evaluateRoot(snapshot, StructureKind.CURRENT, settings) ?: return null
-        val ideal = engine.evaluateRoot(snapshot, StructureKind.IDEAL, settings)
+        val snap = snapshot.withNormalizedPlans()
+        val profileId = planProfileId ?: snap.primaryPlanProfileId()
+        val current = engine.evaluateRoot(snap, StructureKind.CURRENT, settings) ?: return null
+        val ideal = engine.evaluateRoot(snap, StructureKind.IDEAL, settings, profileId)
         val targetRank = engine.config().rank(goals.targetRankId)
         val need = engine.neededForRank(current, targetRank)
 
@@ -70,8 +73,8 @@ class GapAnalyzer(
                         "(ignores differentials and leadership).",
                 )
             }
-            val weakLeaves = snapshot.nodes(StructureKind.CURRENT)
-                .filter { snapshot.children(it.id).isEmpty() && !snapshot.isYou(it) && it.personalPv < 100 }
+            val weakLeaves = snap.nodes(StructureKind.CURRENT)
+                .filter { snap.children(it.id).isEmpty() && !snap.isYou(it) && it.personalPv < 100 }
             if (weakLeaves.isNotEmpty()) {
                 add(
                     "${weakLeaves.size} people in the current map are under 100 personal PV. " +
@@ -80,7 +83,7 @@ class GapAnalyzer(
             }
             if (ideal != null && ideal.estimatedMonthly > current.estimatedMonthly + 1) {
                 add(
-                    "The ideal structure projects about ${(ideal.estimatedMonthly - current.estimatedMonthly).toInt()} " +
+                    "The selected plan projects about ${(ideal.estimatedMonthly - current.estimatedMonthly).toInt()} " +
                         "more monthly than the current map under the same formulas.",
                 )
             }
@@ -93,7 +96,10 @@ class GapAnalyzer(
             groupPvGap = max(0.0, (ideal?.group?.pv ?: targetRank.minGroupPv) - current.group.pv),
             incomeGapToGoal = max(0.0, goals.monthlyIncomeTarget - current.estimatedMonthly),
             incomeGapToIdeal = max(0.0, (ideal?.estimatedMonthly ?: 0.0) - current.estimatedMonthly),
-            peopleGap = max(0, snapshot.nodeCount(StructureKind.IDEAL) - snapshot.nodeCount(StructureKind.CURRENT)),
+            peopleGap = max(
+                0,
+                snap.nodeCount(StructureKind.IDEAL, profileId) - snap.nodeCount(StructureKind.CURRENT),
+            ),
             maxPercentLegsGap = need.maxPercentLegsNeeded,
             suggestions = suggestions,
         )

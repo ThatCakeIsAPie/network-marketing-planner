@@ -5,31 +5,38 @@ import com.networkmarketing.planner.data.local.OrgNodeEntity
 import com.networkmarketing.planner.data.local.PlannerDao
 import com.networkmarketing.planner.data.local.PrefsEntity
 import com.networkmarketing.planner.data.seed.SampleData
-import com.networkmarketing.planner.domain.canvas.CanvasMetrics
-import com.networkmarketing.planner.domain.canvas.LosGraph
-import com.networkmarketing.planner.domain.canvas.TreeLayout
 import com.networkmarketing.planner.domain.model.Member
 import com.networkmarketing.planner.domain.model.OrgNode
 import com.networkmarketing.planner.domain.model.OrgSnapshot
+import com.networkmarketing.planner.domain.model.PlanProfile
 import com.networkmarketing.planner.domain.model.PlannerSettings
 import com.networkmarketing.planner.domain.model.RankIds
 import com.networkmarketing.planner.domain.model.StructureKind
 import com.networkmarketing.planner.domain.model.UserGoals
+import com.networkmarketing.planner.domain.ops.SnapshotOps
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 class PlannerRepository(
     private val dao: PlannerDao,
 ) : PlannerStore {
+
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+
     override val snapshot: Flow<OrgSnapshot> = combine(
         dao.observeMembers(),
         dao.observeNodes(),
-    ) { members, nodes ->
+        dao.observePrefs(),
+    ) { members, nodes, prefs ->
         OrgSnapshot(
             members = members.map { it.toModel() },
             nodes = nodes.map { it.toModel() },
-        )
+            planProfiles = decodeProfiles(prefs?.planProfilesJson),
+            planClaims = decodeClaims(prefs?.planClaimsJson),
+        ).withNormalizedPlans()
     }
 
     override val prefs: Flow<Pair<UserGoals, PlannerSettings>> = dao.observePrefs().map { entity ->
@@ -39,18 +46,36 @@ class PlannerRepository(
 
     override suspend fun ensureSeeded() {
         if (dao.nodeCount() == 0) {
-            val seeded = SampleData.snapshot(PlannerSettings.DEFAULT_BV_PER_PV)
-            dao.replaceOrganization(seeded.members.map { it.toEntity() }, seeded.nodes.map { it.toEntity() })
+            replaceSnapshot(SampleData.snapshot(PlannerSettings.DEFAULT_BV_PER_PV))
+        } else {
+            migratePlansIfNeeded()
         }
         if (dao.getPrefs() == null) {
             dao.upsertPrefs(defaultPrefs())
         }
     }
 
+    private suspend fun migratePlansIfNeeded() {
+        val snap = loadSnapshotOnce()
+        val normalized = snap.withNormalizedPlans()
+        if (normalized != snap) {
+            replaceSnapshot(normalized)
+            return
+        }
+        val prefs = dao.getPrefs() ?: return
+        if (prefs.planProfilesJson == "[]" || prefs.planProfilesJson.isBlank()) {
+            dao.upsertPrefs(
+                prefs.copy(
+                    planProfilesJson = json.encodeToString(listOf(PlanProfile.default())),
+                    planClaimsJson = prefs.planClaimsJson.ifBlank { "{}" },
+                ),
+            )
+        }
+    }
+
     override suspend fun restoreSampleData() {
         val current = dao.getPrefs() ?: defaultPrefs()
-        val seeded = SampleData.snapshot(current.bvPerPv)
-        dao.replaceOrganization(seeded.members.map { it.toEntity() }, seeded.nodes.map { it.toEntity() })
+        replaceSnapshot(SampleData.snapshot(current.bvPerPv))
     }
 
     override suspend fun saveGoals(goals: UserGoals) {
@@ -99,31 +124,18 @@ class PlannerRepository(
         )
     }
 
-    suspend fun upsertMember(member: Member) {
-        dao.upsertMember(member.toEntity())
-    }
-
-    suspend fun upsertNode(node: OrgNode) {
-        dao.upsertNode(node.toEntity())
-    }
-
-    suspend fun addChild(
-        parent: OrgNode,
-        name: String,
-        personalPv: Double,
-        bvPerPv: Double,
-    ) {
-        val siblingCount = 0
-        addNode(
-            kind = parent.kind,
-            canvasX = parent.canvasX + siblingCount * (CanvasMetrics.NODE_DIAMETER + CanvasMetrics.GAP_X),
-            canvasY = parent.canvasY + CanvasMetrics.NODE_DIAMETER + CanvasMetrics.GAP_Y,
-            parentId = parent.id,
-            name = name,
-            personalPv = personalPv,
-            bvPerPv = bvPerPv,
-            partnerName = "",
-            isCouple = false,
+    override suspend fun replaceSnapshot(snapshot: OrgSnapshot) {
+        val normalized = snapshot.withNormalizedPlans()
+        dao.replaceOrganization(
+            normalized.members.map { it.toEntity() },
+            normalized.nodes.map { it.toEntity() },
+        )
+        val prefs = dao.getPrefs() ?: defaultPrefs()
+        dao.upsertPrefs(
+            prefs.copy(
+                planProfilesJson = json.encodeToString(normalized.planProfiles),
+                planClaimsJson = json.encodeToString(normalized.planClaims),
+            ),
         )
     }
 
@@ -137,31 +149,23 @@ class PlannerRepository(
         bvPerPv: Double,
         partnerName: String,
         isCouple: Boolean,
+        planProfileId: String?,
     ): String {
-        val memberId = SampleData.newId("member")
-        val nodeId = SampleData.newId("node")
-        dao.upsertMember(
-            MemberEntity(
-                id = memberId,
-                name = name.ifBlank { "New partner" },
-                notes = "",
-                isYou = false,
-                partnerName = partnerName,
-                isCouple = isCouple,
-            ),
+        val current = currentSnapshot()
+        val (updated, nodeId) = SnapshotOps.addNode(
+            snapshot = current,
+            kind = kind,
+            parentId = parentId,
+            name = name,
+            personalPv = personalPv,
+            bvPerPv = bvPerPv,
+            partnerName = partnerName,
+            isCouple = isCouple,
+            canvasX = canvasX,
+            canvasY = canvasY,
+            planProfileId = planProfileId,
         )
-        dao.upsertNode(
-            OrgNodeEntity(
-                id = nodeId,
-                memberId = memberId,
-                parentId = parentId,
-                kind = kind.name,
-                personalPv = personalPv,
-                personalBv = personalPv * bvPerPv,
-                canvasX = canvasX,
-                canvasY = canvasY,
-            ),
-        )
+        replaceSnapshot(updated)
         return nodeId
     }
 
@@ -175,91 +179,103 @@ class PlannerRepository(
         personalBv: Double,
         vcsPv: Double?,
     ) {
-        dao.upsertMember(
-            MemberEntity(
-                id = node.memberId,
-                name = name.ifBlank { "Unnamed" },
-                notes = notes,
-                isYou = node.memberId == SampleData.YOU_ID,
-                partnerName = partnerName,
-                isCouple = isCouple,
-            ),
+        val updated = SnapshotOps.updatePerson(
+            currentSnapshot(),
+            node.id,
+            name,
+            partnerName,
+            isCouple,
+            notes,
+            personalPv,
+            personalBv,
+            vcsPv,
         )
-        val cappedVcs = vcsPv?.coerceIn(0.0, personalPv.coerceAtLeast(0.0))
-        dao.updateNode(
-            node.copy(personalPv = personalPv, personalBv = personalBv, vcsPv = cappedVcs).toEntity(),
-        )
-    }
-
-    suspend fun updateNodeVolume(node: OrgNode, personalPv: Double, personalBv: Double, name: String) {
-        savePerson(
-            node = node,
-            name = name,
-            partnerName = "",
-            isCouple = false,
-            notes = "",
-            personalPv = personalPv,
-            personalBv = personalBv,
-            vcsPv = node.vcsPv,
-        )
+        replaceSnapshot(updated)
     }
 
     override suspend fun updatePosition(node: OrgNode, canvasX: Float, canvasY: Float) {
-        dao.updateNode(node.copy(canvasX = canvasX, canvasY = canvasY).toEntity())
+        replaceSnapshot(SnapshotOps.move(currentSnapshot(), node.id, canvasX, canvasY))
     }
 
     override suspend fun setParent(snapshot: OrgSnapshot, childId: String, parentId: String?): Boolean {
-        if (!LosGraph.canSetParent(snapshot, childId, parentId)) return false
-        val child = snapshot.node(childId) ?: return false
-        dao.updateNode(child.copy(parentId = parentId).toEntity())
+        val updated = SnapshotOps.setParent(snapshot, childId, parentId) ?: return false
+        replaceSnapshot(updated)
         return true
     }
 
-    override suspend fun applyLayout(snapshot: OrgSnapshot, kind: StructureKind) {
-        val placed = TreeLayout.applyPositions(snapshot, kind)
-        placed.forEach { dao.updateNode(it.toEntity()) }
+    override suspend fun applyLayout(snapshot: OrgSnapshot, kind: StructureKind, planProfileId: String?) {
+        replaceSnapshot(SnapshotOps.applyLayout(snapshot, kind, planProfileId))
     }
 
     override suspend fun deleteSubtree(snapshot: OrgSnapshot, nodeId: String) {
-        val node = snapshot.node(nodeId) ?: return
-        if (snapshot.isYou(node)) return
-        val ids = listOf(nodeId) + snapshot.descendants(nodeId).map { it.id }
-        dao.deleteNodes(ids)
-        dao.deleteMember(node.memberId)
+        replaceSnapshot(SnapshotOps.deleteSubtree(snapshot, nodeId))
     }
 
     override suspend fun copyCurrentToIdeal(snapshot: OrgSnapshot, bvPerPv: Double) {
-        val mapping = mutableMapOf<String, String>()
-        val rebuilt = topological(snapshot.nodes(StructureKind.CURRENT)).map { src ->
-            val newId = if (snapshot.isYou(src)) "n-you-ideal" else SampleData.newId("node")
-            mapping[src.id] = newId
-            src.copy(
-                id = newId,
-                parentId = src.parentId?.let { mapping[it] },
-                kind = StructureKind.IDEAL,
-                personalBv = src.personalPv * bvPerPv,
-            )
-        }
-        dao.replaceOrganization(
-            snapshot.members.map { it.toEntity() },
-            (snapshot.nodes(StructureKind.CURRENT) + rebuilt).map { it.toEntity() },
-        )
+        replaceSnapshot(SnapshotOps.copyCurrentToIdeal(snapshot, bvPerPv))
     }
 
-    private fun topological(nodes: List<OrgNode>): List<OrgNode> {
-        val byParent = nodes.groupBy { it.parentId }
-        val ids = nodes.map { it.id }.toSet()
-        val result = mutableListOf<OrgNode>()
-        val roots = nodes.filter { it.parentId == null || it.parentId !in ids }
-        val queue = ArrayDeque(roots)
-        val seen = mutableSetOf<String>()
-        while (queue.isNotEmpty()) {
-            val n = queue.removeFirst()
-            if (!seen.add(n.id)) continue
-            result += n
-            queue.addAll(byParent[n.id].orEmpty())
-        }
-        return result
+    override suspend fun copyCurrentToPlan(snapshot: OrgSnapshot, planProfileId: String, bvPerPv: Double) {
+        replaceSnapshot(SnapshotOps.copyCurrentToPlan(snapshot, planProfileId, bvPerPv))
+    }
+
+    override suspend fun createPlanProfile(snapshot: OrgSnapshot, name: String, bvPerPv: Double): String {
+        val (updated, id) = SnapshotOps.createPlanProfile(snapshot, name, bvPerPv)
+        replaceSnapshot(updated)
+        return id
+    }
+
+    override suspend fun renamePlanProfile(snapshot: OrgSnapshot, profileId: String, name: String) {
+        replaceSnapshot(SnapshotOps.renamePlanProfile(snapshot, profileId, name))
+    }
+
+    override suspend fun deletePlanProfile(snapshot: OrgSnapshot, profileId: String) {
+        replaceSnapshot(SnapshotOps.deletePlanProfile(snapshot, profileId))
+    }
+
+    override suspend fun claimPlanSlot(snapshot: OrgSnapshot, currentNodeId: String, planNodeId: String): Boolean {
+        val updated = SnapshotOps.claimPlanSlot(snapshot, currentNodeId, planNodeId) ?: return false
+        replaceSnapshot(updated)
+        return true
+    }
+
+    override suspend fun unclaimPlanSlot(snapshot: OrgSnapshot, currentNodeId: String) {
+        replaceSnapshot(SnapshotOps.unclaimPlanSlot(snapshot, currentNodeId))
+    }
+
+    /**
+     * One-shot snapshot from Room for mutations. Uses the latest prefs + a full table read
+     * via replaceOrganization's counterpart: we store enough in prefs and re-read nodes
+     * through temporary upserts — actually use [dao] clear-free path with observe is async.
+     * Instead keep an in-memory cache updated by the Flow would be ideal; for simplicity
+     * we add suspend getters on the DAO.
+     */
+    private suspend fun currentSnapshot(): OrgSnapshot {
+        // Prefer building from the last known Flow value isn't available here.
+        // Use Dao suspend queries added below.
+        return loadSnapshotOnce()
+    }
+
+    private suspend fun loadSnapshotOnce(): OrgSnapshot {
+        val members = dao.getMembers()
+        val nodes = dao.getNodes()
+        val prefs = dao.getPrefs()
+        return OrgSnapshot(
+            members = members.map { it.toModel() },
+            nodes = nodes.map { it.toModel() },
+            planProfiles = decodeProfiles(prefs?.planProfilesJson),
+            planClaims = decodeClaims(prefs?.planClaimsJson),
+        ).withNormalizedPlans()
+    }
+
+    private fun decodeProfiles(raw: String?): List<PlanProfile> {
+        if (raw.isNullOrBlank() || raw == "[]") return emptyList()
+        return runCatching { json.decodeFromString<List<PlanProfile>>(raw) }.getOrDefault(emptyList())
+    }
+
+    private fun decodeClaims(raw: String?): Map<String, String> {
+        if (raw.isNullOrBlank() || raw == "{}") return emptyMap()
+        return runCatching { json.decodeFromString<Map<String, String>>(raw) }.getOrDefault(emptyMap())
     }
 
     private fun defaultPrefs(): PrefsEntity = PrefsEntity(
@@ -293,6 +309,8 @@ class PlannerRepository(
         fqsPy = 0,
         priorYearPqMonths = 0,
         newIboBaselineMonths = 0,
+        planProfilesJson = json.encodeToString(listOf(PlanProfile.default())),
+        planClaimsJson = "{}",
     )
 }
 
@@ -309,6 +327,7 @@ private fun OrgNodeEntity.toModel() = OrgNode(
     vcsPv = vcsPv,
     canvasX = canvasX,
     canvasY = canvasY,
+    planProfileId = planProfileId,
 )
 
 private fun OrgNode.toEntity() = OrgNodeEntity(
@@ -321,6 +340,7 @@ private fun OrgNode.toEntity() = OrgNodeEntity(
     vcsPv = vcsPv,
     canvasX = canvasX,
     canvasY = canvasY,
+    planProfileId = planProfileId,
 )
 
 private fun PrefsEntity.toGoals() = UserGoals(

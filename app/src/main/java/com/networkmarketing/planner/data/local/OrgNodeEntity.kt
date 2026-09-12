@@ -27,4 +27,5 @@ data class OrgNodeEntity(
     val canvasX: Float = 0f,
     val canvasY: Float = 0f,
     val vcsPv: Double? = null,
+    val planProfileId: String? = null,
 )

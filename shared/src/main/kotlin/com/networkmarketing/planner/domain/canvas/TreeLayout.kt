@@ -9,10 +9,14 @@ import com.networkmarketing.planner.domain.model.StructureKind
  * Positions are circle centers.
  */
 object TreeLayout {
-    fun applyPositions(snapshot: OrgSnapshot, kind: StructureKind): List<OrgNode> {
-        val ofKind = snapshot.nodes(kind)
+    fun applyPositions(
+        snapshot: OrgSnapshot,
+        kind: StructureKind,
+        planProfileId: String? = null,
+    ): List<OrgNode> {
+        val ofKind = snapshot.nodes(kind, planProfileId)
         if (ofKind.isEmpty()) return emptyList()
-        val positions = positions(snapshot, kind)
+        val positions = positions(snapshot, kind, planProfileId)
         return ofKind.map { node ->
             val pos = positions[node.id] ?: (node.canvasX to node.canvasY)
             val snapped = CanvasMetrics.snapPoint(pos.first, pos.second)
@@ -20,9 +24,13 @@ object TreeLayout {
         }
     }
 
-    fun positions(snapshot: OrgSnapshot, kind: StructureKind): Map<String, Pair<Float, Float>> {
-        val ofKind = snapshot.nodes(kind)
-        val root = snapshot.root(kind)
+    fun positions(
+        snapshot: OrgSnapshot,
+        kind: StructureKind,
+        planProfileId: String? = null,
+    ): Map<String, Pair<Float, Float>> {
+        val ofKind = snapshot.nodes(kind, planProfileId)
+        val root = snapshot.root(kind, planProfileId)
         val widths = mutableMapOf<String, Float>()
         fun widthOf(id: String): Float {
             widths[id]?.let { return it }

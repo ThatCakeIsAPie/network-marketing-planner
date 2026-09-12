@@ -31,7 +31,9 @@ class StateStore(private val file: File) {
         if (file.exists()) {
             runCatching { json.decodeFromString(PlannerState.serializer(), file.readText()) }
                 .getOrNull()
-                ?.let { return it }
+                ?.let { state ->
+                    return state.copy(snapshot = state.snapshot.withNormalizedPlans())
+                }
         }
         return seed()
     }
@@ -59,7 +61,7 @@ class StateStore(private val file: File) {
 
     /** Apply an update atomically and persist the result. Returns the new state. */
     suspend fun update(transform: (PlannerState) -> PlannerState): PlannerState = mutex.withLock {
-        val next = transform(cached)
+        val next = transform(cached).let { it.copy(snapshot = it.snapshot.withNormalizedPlans()) }
         cached = next
         persist(next)
         next

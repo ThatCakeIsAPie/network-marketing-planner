@@ -5,7 +5,7 @@ import com.networkmarketing.planner.domain.model.OrgSnapshot
 /**
  * Line-of-Sponsorship helpers for the node canvas.
  *
- * Graph UX: drag a node onto another to make it downline; dwell on empty to detach.
+ * Graph UX: hold a node over another to make it downline; hold over current upline to detach.
  * Port/dock APIs remain for older tests but are unused by the circle canvas.
  */
 object LosGraph {
@@ -27,6 +27,11 @@ object LosGraph {
         if (newParentId != null) {
             val parent = snapshot.node(newParentId) ?: return false
             if (parent.kind != child.kind) return false
+            if (parent.kind == com.networkmarketing.planner.domain.model.StructureKind.IDEAL &&
+                parent.effectivePlanProfileId() != child.effectivePlanProfileId()
+            ) {
+                return false
+            }
         }
         return !wouldCreateCycle(snapshot, childId, newParentId)
     }

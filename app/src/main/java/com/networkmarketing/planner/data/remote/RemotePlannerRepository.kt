@@ -45,12 +45,12 @@ class RemotePlannerRepository(
         }
     }
 
-    override val snapshot: Flow<OrgSnapshot> = state.map { it.snapshot }
+    override val snapshot: Flow<OrgSnapshot> = state.map { it.snapshot.withNormalizedPlans() }
     override val prefs: Flow<Pair<UserGoals, PlannerSettings>> = state.map { it.goals to it.settings }
 
     override suspend fun ensureSeeded() {
         runCatching { client.get("$base/api/state").body<PlannerState>() }
-            .onSuccess { state.value = it }
+            .onSuccess { state.value = it.copy(snapshot = it.snapshot.withNormalizedPlans()) }
             .onFailure { Log.e(TAG, "Failed to load state from $base", it) }
     }
 
@@ -59,6 +59,10 @@ class RemotePlannerRepository(
     override suspend fun saveGoals(goals: UserGoals) = put("$base/api/goals", goals)
 
     override suspend fun saveSettings(settings: PlannerSettings) = put("$base/api/settings", settings)
+
+    override suspend fun replaceSnapshot(snapshot: OrgSnapshot) {
+        put("$base/api/state", state.value.copy(snapshot = snapshot.withNormalizedPlans()))
+    }
 
     override suspend fun addNode(
         kind: StructureKind,
@@ -70,14 +74,14 @@ class RemotePlannerRepository(
         bvPerPv: Double,
         partnerName: String,
         isCouple: Boolean,
+        planProfileId: String?,
     ): String {
         return runCatching {
             val resp: AddNodeResp = client.post("$base/api/nodes") {
                 contentType(ContentType.Application.Json)
-                setBody(AddNodeReq(kind, parentId, name, personalPv, partnerName, isCouple))
+                setBody(AddNodeReq(kind, parentId, name, personalPv, partnerName, isCouple, planProfileId))
             }.body()
             state.value = resp.state
-            // Honor the caller's requested canvas position.
             moveInternal(resp.nodeId, canvasX, canvasY)
             resp.nodeId
         }.onFailure { Log.e(TAG, "addNode failed", it) }.getOrDefault("")
@@ -104,8 +108,6 @@ class RemotePlannerRepository(
     }
 
     override suspend fun setParent(snapshot: OrgSnapshot, childId: String, parentId: String?): Boolean {
-        // The server returns 409 for an invalid line of sponsorship; expectSuccess turns that
-        // into an exception, so a failure here simply means "not allowed".
         return runCatching {
             val newState: PlannerState = client.post("$base/api/nodes/$childId/reparent") {
                 contentType(ContentType.Application.Json)
@@ -116,8 +118,13 @@ class RemotePlannerRepository(
         }.getOrDefault(false)
     }
 
-    override suspend fun applyLayout(snapshot: OrgSnapshot, kind: StructureKind) =
-        post("$base/api/layout?kind=${kind.name}")
+    override suspend fun applyLayout(snapshot: OrgSnapshot, kind: StructureKind, planProfileId: String?) {
+        val q = buildString {
+            append("kind=${kind.name}")
+            if (planProfileId != null) append("&planProfileId=$planProfileId")
+        }
+        post("$base/api/layout?$q")
+    }
 
     override suspend fun deleteSubtree(snapshot: OrgSnapshot, nodeId: String) {
         runCatching { state.value = client.delete("$base/api/nodes/$nodeId").body() }
@@ -126,6 +133,45 @@ class RemotePlannerRepository(
 
     override suspend fun copyCurrentToIdeal(snapshot: OrgSnapshot, bvPerPv: Double) =
         post("$base/api/copy-current-to-ideal")
+
+    override suspend fun copyCurrentToPlan(snapshot: OrgSnapshot, planProfileId: String, bvPerPv: Double) {
+        putPost("$base/api/copy-current-to-plan", CopyToPlanReq(planProfileId))
+    }
+
+    override suspend fun createPlanProfile(snapshot: OrgSnapshot, name: String, bvPerPv: Double): String {
+        return runCatching {
+            val resp: CreateProfileResp = client.post("$base/api/plan-profiles") {
+                contentType(ContentType.Application.Json)
+                setBody(PlanProfileReq(name))
+            }.body()
+            state.value = resp.state
+            resp.profileId
+        }.onFailure { Log.e(TAG, "createPlanProfile failed", it) }.getOrDefault("")
+    }
+
+    override suspend fun renamePlanProfile(snapshot: OrgSnapshot, profileId: String, name: String) {
+        put("$base/api/plan-profiles/$profileId", PlanProfileReq(name, profileId))
+    }
+
+    override suspend fun deletePlanProfile(snapshot: OrgSnapshot, profileId: String) {
+        runCatching { state.value = client.delete("$base/api/plan-profiles/$profileId").body() }
+            .onFailure { Log.e(TAG, "deletePlanProfile failed", it) }
+    }
+
+    override suspend fun claimPlanSlot(snapshot: OrgSnapshot, currentNodeId: String, planNodeId: String): Boolean {
+        return runCatching {
+            state.value = client.post("$base/api/claims") {
+                contentType(ContentType.Application.Json)
+                setBody(ClaimReq(currentNodeId, planNodeId))
+            }.body()
+            true
+        }.getOrDefault(false)
+    }
+
+    override suspend fun unclaimPlanSlot(snapshot: OrgSnapshot, currentNodeId: String) {
+        runCatching { state.value = client.delete("$base/api/claims/$currentNodeId").body() }
+            .onFailure { Log.e(TAG, "unclaim failed", it) }
+    }
 
     private suspend fun moveInternal(nodeId: String, x: Float, y: Float) {
         runCatching {
@@ -143,6 +189,15 @@ class RemotePlannerRepository(
                 setBody(body)
             }.body()
         }.onFailure { Log.e(TAG, "PUT $url failed", it) }
+    }
+
+    private suspend inline fun <reified T> putPost(url: String, body: T) {
+        runCatching {
+            state.value = client.post(url) {
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }.body()
+        }.onFailure { Log.e(TAG, "POST $url failed", it) }
     }
 
     private suspend fun post(url: String) {
@@ -163,6 +218,7 @@ private data class AddNodeReq(
     val personalPv: Double,
     val partnerName: String,
     val isCouple: Boolean,
+    val planProfileId: String? = null,
 )
 
 @Serializable
@@ -184,3 +240,15 @@ private data class ReparentReq(val parentId: String?)
 
 @Serializable
 private data class AddNodeResp(val nodeId: String, val state: PlannerState)
+
+@Serializable
+private data class PlanProfileReq(val name: String, val profileId: String? = null)
+
+@Serializable
+private data class ClaimReq(val currentNodeId: String, val planNodeId: String)
+
+@Serializable
+private data class CopyToPlanReq(val planProfileId: String)
+
+@Serializable
+private data class CreateProfileResp(val profileId: String, val state: PlannerState)

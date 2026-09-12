@@ -13,6 +13,24 @@ data class AddNodeRequest(
     val personalPv: Double = 100.0,
     val partnerName: String = "",
     val isCouple: Boolean = false,
+    val planProfileId: String? = null,
+)
+
+@Serializable
+data class PlanProfileRequest(
+    val name: String = "Plan",
+    val profileId: String? = null,
+)
+
+@Serializable
+data class ClaimRequest(
+    val currentNodeId: String,
+    val planNodeId: String,
+)
+
+@Serializable
+data class CopyToPlanRequest(
+    val planProfileId: String,
 )
 
 @Serializable
@@ -47,3 +65,9 @@ data class CalculatorResponse(
 
 @Serializable
 data class ErrorResponse(val error: String)
+
+@Serializable
+data class CreatePlanProfileResponse(
+    val profileId: String,
+    val state: PlannerState,
+)

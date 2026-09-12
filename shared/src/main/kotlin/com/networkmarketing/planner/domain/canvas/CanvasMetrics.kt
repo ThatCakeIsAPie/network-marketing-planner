@@ -12,8 +12,11 @@ object CanvasMetrics {
     const val GAP_Y = 48f
     const val WORLD_WIDTH = 4200f
     const val WORLD_HEIGHT = 3200f
-    /** How long (ms) to dwell on empty before detach is armed. */
-    const val DETACH_DWELL_MS = 400L
+    /** Hover / empty-dwell duration (ms) before attach or detach commits. */
+    const val ATTACH_DWELL_MS = 1_000L
+    const val DETACH_DWELL_MS = 1_000L
+    /** Slightly larger than the circle so attach hover is forgiving. */
+    const val ATTACH_HIT_RADIUS = NODE_RADIUS * 1.4f
 
     /** @deprecated Prefer [NODE_DIAMETER]; kept for callers during the circle migration. */
     const val NODE_WIDTH = NODE_DIAMETER

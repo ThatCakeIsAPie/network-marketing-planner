@@ -9,11 +9,15 @@ enum class StructureKind {
 }
 
 /**
- * One placement of a [Member] in either the current or ideal organization.
+ * One placement of a [Member] in either the current map or a plan profile.
  *
  * Volume is monthly personal PV/BV. Line of Sponsorship is [parentId]
  * (upline). [canvasX] / [canvasY] are persisted world-space positions in dp
  * for the Map / Plan node canvas.
+ *
+ * [kind] [StructureKind.IDEAL] nodes belong to a [PlanProfile] via [planProfileId].
+ * Null [planProfileId] on Ideal nodes is treated as [PlanProfile.DEFAULT_ID] after
+ * [OrgSnapshot.withNormalizedPlans].
  *
  * [vcsPv] is Verified Customer Sales PV for Rule 4.12 / baseline. Null means
  * use Goals [PlannerSettings.vcsPercent] × [personalPv] (legacy / default).
@@ -30,7 +34,12 @@ data class OrgNode(
     val canvasY: Float = 0f,
     /** Verified Customer Sales PV. Null = Goals [PlannerSettings.vcsPercent] × personal PV. */
     val vcsPv: Double? = null,
+    /** Plan profile this Ideal node belongs to. Ignored for Current nodes. */
+    val planProfileId: String? = null,
 ) {
+    fun effectivePlanProfileId(): String =
+        if (kind == StructureKind.IDEAL) planProfileId ?: PlanProfile.DEFAULT_ID else ""
+
     fun effectiveVcsPv(settings: PlannerSettings): Double {
         val cap = personalPv.coerceAtLeast(0.0)
         return when {

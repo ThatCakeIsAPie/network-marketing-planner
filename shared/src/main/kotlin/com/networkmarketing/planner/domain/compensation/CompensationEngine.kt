@@ -97,8 +97,9 @@ class CompensationEngine(
         snapshot: OrgSnapshot,
         kind: StructureKind,
         settings: PlannerSettings,
+        planProfileId: String? = null,
     ): PayoutBreakdown? {
-        val root = snapshot.root(kind) ?: return null
+        val root = snapshot.root(kind, planProfileId) ?: return null
         return evaluateNode(snapshot, root.id, settings)
     }
 
