@@ -22,6 +22,7 @@ data class PrefsEntity(
     val includePerformancePlus: Boolean,
     val includeCsi: Boolean,
     val csiEligible: Boolean,
+    val fsiEligible: Boolean = true,
     val bfiEligible: Boolean,
     val bbiEligible: Boolean,
     val isPlatinumOrAbove: Boolean,
@@ -35,6 +36,10 @@ data class PrefsEntity(
     val fqsPy: Int,
     val priorYearPqMonths: Int,
     val newIboBaselineMonths: Int,
+    /** JSON array of PlanProfile. */
+    val planProfilesJson: String = "[]",
+    /** JSON object currentNodeId → planNodeId. */
+    val planClaimsJson: String = "{}",
 ) {
     companion object {
         const val SINGLETON_ID = 1

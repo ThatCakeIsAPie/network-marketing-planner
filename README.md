@@ -2,7 +2,7 @@
 
 Open-source **Android** planner for network marketers. Map a current organization, sketch an ideal structure, and estimate what PV/BV-style volume it takes to reach an income or rank goal.
 
-This is a **local-first** v1: data stays on the device (Room). There is no account system and no company API.
+It runs three ways from **one shared codebase**: the **Android app** (smoothest experience), a **browser** version on desktop, and the same page on a **phone browser**. A small self-hosted **server** holds the data and does the payout math, so every client reads and writes the same organization. The app also works **fully offline on-device** (Room) when no server is configured.
 
 **Display name:** Network Marketing Planner  
 **Application ID:** `com.networkmarketing.planner`  
@@ -16,31 +16,55 @@ This project is **not affiliated with, endorsed by, or sponsored by** any networ
 
 | Tab | Purpose |
 | --- | --- |
-| **Map** | Infinite 20 dp grid canvas (pan, pinch / +− zoom, Fit, 100%). IBO nodes with single/couple names, PV/BV, top **upline** and bottom **downline** docks. Drag dock-to-dock to set Line of Sponsorship. Positions persist in Room. |
-| **Plan** | Same node canvas for the ideal structure, plus gap vs the current map. |
+| **Map** | Infinite 20 dp grid canvas (pan, pinch / +− zoom, Fit, 100%). Circular IBO nodes (name · PV · $) with straight arrow edges for Line of Sponsorship. Hold over another node to set upline; hold over current upline to detach. Positions persist in Room. |
+| **Plan** | Same node canvas for named **plan profiles** (Ideal, Emerald, custom targets…), plus gap vs the current map. |
 | **Calculator** | PV/BV inputs (or “use current org”), Core Plan payout lines, Plus/Elite, Rule 4.12 factor, rank progress. |
 | **Goals** | Income/rank goals, retail 10/15/20%, Rule 4.12 / VCS, YTD Q/PQ counters, bonus toggles, full assumption list. |
 
 Onboarding asks you to accept the unofficial-tool disclaimer and set a first income/rank goal.
 
+## Architecture (shared core, three clients)
+
+The project is a Gradle multi-module build so the organization model and the payout engine are written **once** and reused everywhere:
+
+| Module | What it is |
+| --- | --- |
+| `:shared` | Pure-Kotlin/JVM core: domain models, the `AmwayNaPy2027` compensation engine, LOS/tree layout, sample data, and `SnapshotOps` edits. Serializable so it travels over the wire. |
+| `:server` | [Ktor](https://ktor.io) server. Holds the single source of truth (`PlannerState` in a JSON file), exposes a REST API that reuses the `:shared` engine, and serves the browser app. |
+| `:app` | The Android app. Uses `:shared` for all math and can talk to `:server` through a Ktor client. |
+
+The **server is the source of truth**. The browser app calls its REST API directly; the Android app reads/writes the same API (mirroring responses into the reactive UI) or, with no server configured, keeps everything on-device in Room.
+
+## Browser version & shared server
+
+Run the server (see below) and open `http://localhost:8080`. The browser app has the same **Map / Plan / Calculator / Goals** tabs, an SVG org tree with a node inspector, and live payout cards — usable from a desktop or phone browser.
+
+To point the **Android app** at a server, open **Goals → Sync**, enter the server URL, and tap **Connect & sync** (from the emulator the host is `http://10.0.2.2:8080`). You can also bake a default in at build time with `-PplannerServerUrl=<url>`. Edits made in any client show up in the others on next load.
+
+### REST API (selected)
+
+`GET /api/state`, `PUT /api/goals`, `PUT /api/settings`, `POST /api/nodes`, `PUT /api/nodes/{id}`, `POST /api/nodes/{id}/move`, `POST /api/nodes/{id}/reparent`, `DELETE /api/nodes/{id}`, `POST /api/layout?kind=CURRENT|IDEAL`, `POST /api/sample-data`, `GET /api/calculator?kind=…`, `GET /api/gap`, `GET /api/config`.
+
 ## Domain model
 
-Extensible types live under `app/src/main/java/com/networkmarketing/planner/domain`:
+Extensible types live under `shared/src/main/kotlin/com/networkmarketing/planner/domain`:
 
 - `Member` — a person or couple (`isCouple`, `partnerName`)
-- `OrgNode` — that person placed in `CURRENT` or `IDEAL` with monthly personal PV/BV and canvas `x/y`
-- `OrgSnapshot` — members + nodes; **team volume** is personal + all descendants
-- `LosGraph` / `ElbowPath` / `TreeLayout` — Line of Sponsorship wiring, Faleth-style mid-X elbows, auto-layout
+- `OrgNode` — that person placed in `CURRENT` or a plan profile (`IDEAL` + `planProfileId`) with monthly personal PV/BV and canvas `x/y`
+- `OrgSnapshot` — members + nodes + `planProfiles` + `planClaims` (Map current→plan); **team volume** is personal + all descendants
+- `PlanProfile` — named planned org (replaces single Ideal); Map can overlay a profile as ghosts and claim slots via hold-to-attach
+- `LosGraph` / `ElbowPath` / `TreeLayout` — Line of Sponsorship wiring, straight arrow edges, auto-layout (circle centers)
 
 ## Using the Map canvas
 
-1. **Pan** by dragging empty grid. **Zoom** with pinch or the + / − / 100% / Fit controls (0.25×–2.0×).
-2. **Move** a person by dragging the card; positions snap to the 20 dp grid and save locally.
-3. **LOS:** drag the **top dock** (upline) or a **bottom dock** (one port per frontline plus a vacant add port) to another dock. One edge per port; reconnecting replaces the old link. Drop a vacant bottom dock on empty grid to add a downline.
-4. **Tap** a node for the inspector: single vs couple, names, PV, BV (default PV × 3.43), notes, detach, delete.
+1. **Pan** with two fingers (or empty-grid marquee select with one finger). **Zoom** with pinch or the + / − / 100% / Fit controls (0.25×–2.0×).
+2. **Move** a person by dragging their circle; positions snap to the 20 dp grid and save locally.
+3. **LOS:** hold a circle over another for about a second to make it **downline** of the target. Hold it over its **current upline** to detach. Sheet also has Add downline / Detach.
+4. **Tap** a node for the inspector: single vs couple, names, PV, VCS PV, BV, notes, detach, delete.
 5. Sample data opens as a positioned graph, including one couple (Alex & Chris).
 
-The canvas mirrors the Faleth CRM workspace *feel* (custom grid, pan/zoom, port wiring, orthogonal mid-X elbows). Faleth’s left/right workflow ports and ticket/point semantics are **not** used — this graph is Line of Sponsorship for people and AmwayNA_PY2027 volume. The Faleth repo was not readable from this environment; behavior follows the documented TemplateGraphEditor pattern.
+The Map is an Obsidian/tldraw-style graph (circles + straight arrows) for Line of Sponsorship and AmwayNA_PY2027 volume — not a docked Faleth workflow editor.
+
 - `UserGoals` / `PlannerSettings` — income/rank targets, Rule 4.12, YTD pin counters
 - `CompensationConfig` (`AmwayNA_PY2027`) + `CompensationEngine` + `LeadershipBonus` — **the only place payout math should change**
 
@@ -73,7 +97,7 @@ Rates live in `AmwayNaPy2027.kt`. Formulas live in `CompensationEngine.kt` and `
 - **PQ (Platinum+):** 7,500 Ruby PV **or** 4,000 Ruby PV + a 25% leg. Annual table: 6–11 PQ → \$6,000; 12 PQ → \$18,000; 12 PQ + 90,000 Ruby PV → \$20,000 (shown from YTD inputs, not folded into monthly estimated payout).
 - **FQ:** one per 25% frontline per month (max 12 per leg per PY).
 - **TTCI:** Platinum first-time ≥6 Q months in 12 rolling with 3 consecutive; requal ≥6 in the PY. Founders Platinum: 12 Q months (VE: 10–11 with 90k Group PV or 108k Total Downline PV). Documented first/second year amounts \$1,500/\$3,500 and \$2,500/\$7,500 — confirm against the current PY table.
-- **FSI:** progress follows Founders Platinum / VE; payout table not encoded.
+- **FSI:** +5% of **VCS BV** (`VCS PV × BV:PV`) as an extra bonus when Goals FSI is on and this month’s performance % stays under 18% (planning stand-in for “never hit 18% in the PY”). Does **not** raise the schedule % used for differential. Per-node VCS PV on the Map/Plan editor drives Rule 4.12 and FSI for that IBO (Goals VCS % is the default when unset).
 - **Emerald / Diamond:** pin progress (3 / 6 Silver Producer legs for six months). Profit-sharing schedules are **not** encoded.
 
 ## Build and run
@@ -97,8 +121,18 @@ Debug APK path: `app/build/outputs/apk/debug/app-debug.apk`
 Unit tests for the engine (no emulator):
 
 ```bash
-./gradlew testDebugUnitTest
+./gradlew :shared:test        # domain + compensation engine (31 tests)
+./gradlew :server:test        # REST API behavior
+./gradlew testDebugUnitTest   # app-level tests
 ```
+
+### Run the server + browser app
+
+```bash
+./gradlew :server:run         # serves the API and web app on http://localhost:8080
+```
+
+Data persists to `planner-data.json` (override with `PLANNER_DATA_FILE`; port with `PLANNER_PORT`).
 
 If `ANDROID_HOME` / `ANDROID_SDK_ROOT` is unset, create `local.properties` with:
 
@@ -110,7 +144,7 @@ sdk.dir=/path/to/Android/sdk
 
 ## Out of scope (v1)
 
-Company APIs, iOS, accounts/cloud sync, and Play Store publishing.
+Company APIs, iOS, hosted multi-user accounts (the shared server is single-tenant and self-hosted, with no auth yet), real-time push between clients (changes appear on next load), and Play Store publishing.
 
 ## License
 

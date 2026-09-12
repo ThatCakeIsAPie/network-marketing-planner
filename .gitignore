@@ -22,3 +22,12 @@ keystore.properties
 *.keystore
 !debug.keystore
 .vscode/
+
+.android-sdk/
+.jdks/
+.tools/
+.gradle-user-home/
+.tmp/
+.android-user/
+.android-user-home/
+network-marketing-planner-debug.apk

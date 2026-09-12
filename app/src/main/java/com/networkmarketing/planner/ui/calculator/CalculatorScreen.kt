@@ -13,6 +13,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -40,7 +42,14 @@ fun CalculatorScreen(
     val target = viewModel.engine().config().rank(state.goals.targetRankId)
     val need = viewModel.engine().neededForRank(payout, target)
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Volume calculator") }) }) { padding ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Volume calculator") },
+                actions = { Spacer(Modifier.width(48.dp)) },
+            )
+        },
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -113,6 +122,7 @@ fun CalculatorScreen(
             MetricRow {
                 MetricCard("Plus / Elite", money(payout.corePlus.performancePlusAmount), Modifier.weight(1f), percent(payout.corePlus.performancePlusPercent))
                 MetricCard("Retail", money(payout.retailMargin), Modifier.weight(1f), percent(state.settings.retailMarginPercent))
+                MetricCard("FSI", money(payout.fsiBonus), Modifier.weight(1f), "5% of VCS BV")
             }
             Card(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

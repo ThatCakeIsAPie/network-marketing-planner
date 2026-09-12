@@ -22,6 +22,12 @@ interface PlannerDao {
     @Query("SELECT * FROM planner_prefs WHERE id = 1")
     suspend fun getPrefs(): PrefsEntity?
 
+    @Query("SELECT * FROM members ORDER BY isYou DESC, name ASC")
+    suspend fun getMembers(): List<MemberEntity>
+
+    @Query("SELECT * FROM org_nodes")
+    suspend fun getNodes(): List<OrgNodeEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertMembers(members: List<MemberEntity>)
 

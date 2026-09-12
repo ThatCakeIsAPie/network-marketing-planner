@@ -16,3 +16,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "NetworkMarketingPlanner"
 include(":app")
+include(":shared")
+include(":server")
