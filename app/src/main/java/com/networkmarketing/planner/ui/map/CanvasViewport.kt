@@ -48,10 +48,10 @@ data class CanvasViewport(
             density: Float,
         ): CanvasViewport {
             if (nodes.isEmpty() || viewWidth <= 0f || viewHeight <= 0f) return CanvasViewport()
-            val minX = nodes.minOf { it.canvasX } - 32f
-            val minY = nodes.minOf { it.canvasY } - 32f
-            val maxX = nodes.maxOf { it.canvasX + CanvasMetrics.NODE_WIDTH } + 32f
-            val maxY = nodes.maxOf { it.canvasY + CanvasMetrics.nodeHeight(coupleOf(it)) } + 32f
+            val maxX = nodes.maxOf { it.canvasX + CanvasMetrics.NODE_RADIUS } + 32f
+            val maxY = nodes.maxOf { it.canvasY + CanvasMetrics.NODE_RADIUS } + 32f
+            val minX = nodes.minOf { it.canvasX } - CanvasMetrics.NODE_RADIUS - 32f
+            val minY = nodes.minOf { it.canvasY } - CanvasMetrics.NODE_RADIUS - 32f
             val worldW = ((maxX - minX) * density).coerceAtLeast(1f)
             val worldH = ((maxY - minY) * density).coerceAtLeast(1f)
             val zoom = min(viewWidth / worldW, viewHeight / worldH).coerceIn(MIN_ZOOM, 1.15f)

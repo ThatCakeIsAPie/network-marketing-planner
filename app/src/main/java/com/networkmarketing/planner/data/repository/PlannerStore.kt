@@ -40,6 +40,7 @@ interface PlannerStore {
         notes: String,
         personalPv: Double,
         personalBv: Double,
+        vcsPv: Double? = null,
     )
     suspend fun updatePosition(node: OrgNode, canvasX: Float, canvasY: Float)
     suspend fun setParent(snapshot: OrgSnapshot, childId: String, parentId: String?): Boolean

@@ -53,6 +53,7 @@ fun OrgNodeSheet(
         notes: String,
         personalPv: Double,
         personalBv: Double,
+        vcsPv: Double,
     ) -> Unit,
     onAddDownline: () -> Unit,
     onDelete: () -> Unit,
@@ -66,9 +67,17 @@ fun OrgNodeSheet(
     var notes by rememberSaveable(node.id) { mutableStateOf(member?.notes.orEmpty()) }
     var pv by rememberSaveable(node.id) { mutableStateOf(formatNum(node.personalPv)) }
     var bv by rememberSaveable(node.id) { mutableStateOf(formatNum(node.personalBv)) }
+    var vcs by rememberSaveable(node.id) {
+        mutableStateOf(formatNum(node.effectiveVcsPv(settings)))
+    }
     val derived = abs(node.personalBv - node.personalPv * settings.bvPerPv) < 0.05
     var deriveBv by rememberSaveable(node.id) { mutableStateOf(derived) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val personalPvValue = pv.toDoubleOrNull() ?: 0.0
+    val vcsPvValue = (vcs.toDoubleOrNull() ?: 0.0).coerceIn(0.0, personalPvValue.coerceAtLeast(0.0))
+    val vcsRatio = if (personalPvValue > 1e-9) vcsPvValue / personalPvValue else 0.0
+    val meets60 = vcsRatio + 1e-9 >= 0.60
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
@@ -156,6 +165,31 @@ fun OrgNodeSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
+                value = vcs,
+                onValueChange = { vcs = it },
+                label = { Text("VCS PV (of personal)") },
+                supportingText = {
+                    Text(
+                        if (meets60) {
+                            "≥60% VCS met (${percent(vcsRatio)}) — Rule 4.12 / baseline"
+                        } else {
+                            "Below 60% VCS (${percent(vcsRatio)}) — Personal BV prorated"
+                        },
+                    )
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            FilterChip(
+                selected = meets60,
+                onClick = {
+                    val p = pv.toDoubleOrNull() ?: 0.0
+                    vcs = formatNum(if (meets60) p * 0.59 else p * 0.60)
+                },
+                label = { Text(if (meets60) "≥60% VCS" else "Set to 60% VCS") },
+            )
+            OutlinedTextField(
                 value = notes,
                 onValueChange = { notes = it },
                 label = { Text("Notes") },
@@ -165,12 +199,13 @@ fun OrgNodeSheet(
                 onClick = {
                     val p = pv.toDoubleOrNull() ?: 0.0
                     val b = if (deriveBv) p * settings.bvPerPv else bv.toDoubleOrNull() ?: (p * settings.bvPerPv)
-                    onSave(name, partner, couple, notes, p, b)
+                    val v = (vcs.toDoubleOrNull() ?: (p * settings.vcsPercent)).coerceIn(0.0, p.coerceAtLeast(0.0))
+                    onSave(name, partner, couple, notes, p, b, v)
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Save") }
             OutlinedButton(onClick = onAddDownline, modifier = Modifier.fillMaxWidth()) {
-                Text("Add downline from this dock")
+                Text("Add downline")
             }
             if (!isYou) {
                 TextButton(onClick = onDetachUpline) { Text("Detach upline (keep on canvas)") }

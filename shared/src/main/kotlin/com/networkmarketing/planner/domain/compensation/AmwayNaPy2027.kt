@@ -24,8 +24,9 @@ object AmwayNaPy2027 {
         "Leadership Bonus: qualify with one 25% leg plus ≥2,500 PV outside that leg, OR two 25% legs. Bottom-up 6% of Group BV with Published LBA = 6% × 7,500 × BV:PV ($1,543.50 at 3.43). Intermediate IBOs under 25% contribute 6% of their BV to the roll-up without keeping it. See LeadershipBonus for the documented examples.",
         "Depth Bonus: 3+ in-market 25% legs and at least one of those has a 25% downline. Planner pays 1% of those depth legs’ Group BV. MDA ($257.25 at 3.43) and top-down splits to further upline are omitted.",
         "Retail margin is selectable 10% / 15% / 20% of customer-sales BV (Personal BV × customer-sales %). Official retail markup is typically ~10% of IBO cost vs retail; 15/20 are planner what-ifs.",
-        "Discretionary Core Plus (SSI, FSI, BFI, BBI, CSI, TTCI, PQ, FQ) uses documented monthly rules plus year-to-date inputs on Goals. Annual profit-sharing (Emerald/Diamond) is progress-only.",
-        "Baseline for discretionary incentives and events: 150 Personal PV/month (1,800/year) and 60% VCS.",
+        "Discretionary Core Plus (SSI, BFI, BBI, CSI, TTCI, PQ, FQ) uses documented monthly rules plus year-to-date inputs on Goals. Annual profit-sharing (Emerald/Diamond) is progress-only.",
+        "FSI (Founders Sales Incentive): +5% of VCS BV (VCS PV × BV:PV) as an extra bonus — not on all Personal BV, and it does not raise the schedule % used for differential. Eligible only when Goals FSI is on and this month’s performance % stays under the 18% bracket (Group PV under 2,500), reflecting a PY that never hit 18%.",
+        "Baseline for discretionary incentives and events: 150 Personal PV/month (1,800/year) and 60% VCS. Per-node VCS PV on the Map editor overrides the Goals default VCS % for that IBO’s Rule 4.12 / baseline.",
         "Single-month snapshot plus optional YTD counters. Real pin ranks often need consecutive months, in-market vs international splits, and compliance reviews this planner does not run.",
     )
 
@@ -89,6 +90,8 @@ object AmwayNaPy2027 {
         bbiPerformanceMultiplier = 0.40,
         csiTargetPercent = 0.10,
         csiMonthlyCap = 75.0,
+        fsiBonusPercent = 0.05,
+        fsiMaxPerformanceExclusive = 0.18,
         assumptions = ASSUMPTIONS,
     )
 }

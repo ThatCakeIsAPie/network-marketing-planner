@@ -53,9 +53,15 @@ fun MapScreen(
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
     var fitted by remember { mutableStateOf(false) }
     var editorOpen by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf(setOf<String>()) }
     val nodes = state.snapshot.nodes(StructureKind.CURRENT)
-    val selected = state.selectedNodeId?.let { state.snapshot.node(it) }
+    val selected = selectedIds.singleOrNull()?.let { state.snapshot.node(it) }
     val payout = state.currentPayout
+
+    LaunchedEffect(state.selectedNodeId) {
+        val id = state.selectedNodeId ?: return@LaunchedEffect
+        if (id !in selectedIds) selectedIds = setOf(id)
+    }
 
     LaunchedEffect(viewSize, nodes.size) {
         if (!fitted && viewSize.width > 0 && nodes.isNotEmpty()) {
@@ -99,12 +105,13 @@ fun MapScreen(
                 snapshot = state.snapshot,
                 kind = StructureKind.CURRENT,
                 payouts = state.currentPayouts,
-                selectedId = selected?.id,
+                selectedIds = selectedIds,
                 viewport = viewport,
                 onViewportChange = { viewport = it },
-                onSelect = {
-                    viewModel.selectNode(it)
-                    editorOpen = it != null
+                onSelectionChange = { ids ->
+                    selectedIds = ids
+                    viewModel.selectNode(ids.singleOrNull())
+                    editorOpen = ids.size == 1
                 },
                 onMoveEnd = { node, x, y -> viewModel.moveNode(node, x, y) },
                 onApplyConnection = { viewModel.applyLosEdit(it) },
@@ -125,15 +132,23 @@ fun MapScreen(
             ) {
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     Text(
-                        "Drag the grid to pan · pinch or +/− to zoom · drag top/bottom docks to set LOS",
+                        "Drag onto a node to set upline · hold on empty to detach · two-finger pan · pinch to zoom",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (payout != null) {
+                    if (selectedIds.size > 1) {
                         Text(
-                            "${money(payout.estimatedMonthly)} · ${payout.currentRank.title} · " +
-                                "${percent(payout.performancePercent)} · G ${qty(payout.group.pv)} PV · " +
-                                "${payout.maxPercentLegs}×25%",
+                            "${selectedIds.size} selected · tap empty space to clear",
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    } else if (payout != null) {
+                        Text(
+                            "Group ${qty(payout.group.pv)} PV · ${qty(payout.group.bv)} BV",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            "Est. monthly ${money(payout.estimatedMonthly)} · ${payout.currentRank.title} · " +
+                                "${percent(payout.performancePercent)} · ${payout.maxPercentLegs}×25%",
                             style = MaterialTheme.typography.bodyLarge,
                         )
                     }
@@ -187,8 +202,8 @@ fun MapScreen(
             settings = state.settings,
             payout = state.currentPayouts[selected.id],
             onDismiss = { editorOpen = false },
-            onSave = { name, partner, couple, notes, pv, bv ->
-                viewModel.savePerson(selected, name, partner, couple, notes, pv, bv)
+            onSave = { name, partner, couple, notes, pv, bv, vcs ->
+                viewModel.savePerson(selected, name, partner, couple, notes, pv, bv, vcs)
                 editorOpen = false
             },
             onAddDownline = {

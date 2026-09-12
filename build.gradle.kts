@@ -5,5 +5,5 @@ plugins {
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.ksp) apply false
-    alias(libs.plugins.ktor) apply false
+    // Ktor plugin is applied only by :server (not needed to assemble the Android APK).
 }

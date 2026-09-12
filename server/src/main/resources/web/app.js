@@ -8,9 +8,8 @@ const store = {
   gap: null,        // StructureGap
 };
 
-const NODE_W = 220;
-const NODE_H = 140;
-const NODE_H_COUPLE = 160;
+const NODE_R = 56;
+const NODE_D = NODE_R * 2;
 
 const view = {
   map: { box: null, selected: null },
@@ -58,13 +57,28 @@ function displayName(node) {
 function nodesOfKind(kind) {
   return store.state.snapshot.nodes.filter((n) => n.kind === kind);
 }
-function nodeHeight(node) {
-  const m = memberOf(node);
-  return m && m.isCouple ? NODE_H_COUPLE : NODE_H;
+function nodeHeight(_node) {
+  return NODE_D;
 }
 function isYou(node) {
   const m = memberOf(node);
   return m && m.isYou;
+}
+
+function moneyFmt(value) {
+  try {
+    return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
+  } catch (_) {
+    return "$" + Math.round(value);
+  }
+}
+
+function rimPoint(cx, cy, tx, ty) {
+  const dx = tx - cx;
+  const dy = ty - cy;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-3) return [cx, cy];
+  return [cx + (dx / len) * NODE_R, cy + (dy / len) * NODE_R];
 }
 
 // ---------- Load everything ----------
@@ -109,9 +123,23 @@ async function mutate(promise) {
 }
 
 // ---------- SVG org rendering ----------
-function elbowPath(px, py, cx, cy) {
-  const midY = (py + cy) / 2;
-  return `M ${px} ${py} L ${px} ${midY} L ${cx} ${midY} L ${cx} ${cy}`;
+function ensureArrowMarker(svg, ns) {
+  if (svg.querySelector("#los-arrow")) return;
+  const defs = document.createElementNS(ns, "defs");
+  const marker = document.createElementNS(ns, "marker");
+  marker.setAttribute("id", "los-arrow");
+  marker.setAttribute("markerWidth", "8");
+  marker.setAttribute("markerHeight", "8");
+  marker.setAttribute("refX", "6");
+  marker.setAttribute("refY", "3");
+  marker.setAttribute("orient", "auto");
+  marker.setAttribute("markerUnits", "strokeWidth");
+  const tip = document.createElementNS(ns, "path");
+  tip.setAttribute("d", "M0,0 L6,3 L0,6 Z");
+  tip.setAttribute("fill", "#1e1e1e");
+  marker.appendChild(tip);
+  defs.appendChild(marker);
+  svg.appendChild(defs);
 }
 
 function renderCanvas(kind) {
@@ -125,64 +153,60 @@ function renderCanvas(kind) {
   svg.setAttribute("viewBox", `${box.x} ${box.y} ${box.w} ${box.h}`);
 
   const ns = "http://www.w3.org/2000/svg";
+  ensureArrowMarker(svg, ns);
   const byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
 
-  // Edges first (so they sit behind cards)
+  // Edges first (behind circles); canvasX/Y are circle centers.
   nodes.forEach((n) => {
     if (!n.parentId || !byId[n.parentId]) return;
     const p = byId[n.parentId];
-    const px = p.canvasX + NODE_W / 2;
-    const py = p.canvasY + nodeHeight(p);
-    const cx = n.canvasX + NODE_W / 2;
-    const cy = n.canvasY;
+    const [x1, y1] = rimPoint(p.canvasX, p.canvasY, n.canvasX, n.canvasY);
+    const [x2, y2] = rimPoint(n.canvasX, n.canvasY, p.canvasX, p.canvasY);
     const path = document.createElementNS(ns, "path");
-    path.setAttribute("d", elbowPath(px, py, cx, cy));
+    path.setAttribute("d", `M ${x1} ${y1} L ${x2} ${y2}`);
     path.setAttribute("class", "edge");
+    path.setAttribute("marker-end", "url(#los-arrow)");
     svg.appendChild(path);
   });
 
-  // Node cards
   nodes.forEach((n) => {
-    const h = nodeHeight(n);
     const g = document.createElementNS(ns, "g");
     g.style.cursor = "pointer";
 
-    const rect = document.createElementNS(ns, "rect");
-    rect.setAttribute("x", n.canvasX);
-    rect.setAttribute("y", n.canvasY);
-    rect.setAttribute("width", NODE_W);
-    rect.setAttribute("height", h);
-    rect.setAttribute("rx", 12);
-    let cls = "node-rect";
+    const circle = document.createElementNS(ns, "circle");
+    circle.setAttribute("cx", n.canvasX);
+    circle.setAttribute("cy", n.canvasY);
+    circle.setAttribute("r", NODE_R);
+    let cls = "node-circle";
     if (isYou(n)) cls += " you";
     if (view[which].selected === n.id) cls += " selected";
-    rect.setAttribute("class", cls);
-    g.appendChild(rect);
+    circle.setAttribute("class", cls);
+    g.appendChild(circle);
 
     const title = document.createElementNS(ns, "text");
-    title.setAttribute("x", n.canvasX + 16);
-    title.setAttribute("y", n.canvasY + 30);
+    title.setAttribute("x", n.canvasX);
+    title.setAttribute("y", n.canvasY - 10);
     title.setAttribute("class", "node-title");
+    title.setAttribute("text-anchor", "middle");
     title.textContent = displayName(n);
     g.appendChild(title);
 
-    const sub = document.createElementNS(ns, "text");
-    sub.setAttribute("x", n.canvasX + 16);
-    sub.setAttribute("y", n.canvasY + 54);
-    sub.setAttribute("class", "node-sub");
-    sub.textContent = `${pv(n.personalPv)} PV · ${pv(n.personalBv)} BV`;
-    g.appendChild(sub);
+    const pvLine = document.createElementNS(ns, "text");
+    pvLine.setAttribute("x", n.canvasX);
+    pvLine.setAttribute("y", n.canvasY + 8);
+    pvLine.setAttribute("class", "node-sub");
+    pvLine.setAttribute("text-anchor", "middle");
+    pvLine.textContent = `${pv(n.personalPv)}PV`;
+    g.appendChild(pvLine);
 
-    // per-node group payout badge
     const payout = store.calc[kind] && store.calc[kind].perNode[n.id];
-    if (payout) {
-      const badge = document.createElementNS(ns, "text");
-      badge.setAttribute("x", n.canvasX + 16);
-      badge.setAttribute("y", n.canvasY + 78);
-      badge.setAttribute("class", "node-sub");
-      badge.textContent = `G ${pv(payout.group.pv)} PV · ${pct(payout.performancePercent)}`;
-      g.appendChild(badge);
-    }
+    const moneyLine = document.createElementNS(ns, "text");
+    moneyLine.setAttribute("x", n.canvasX);
+    moneyLine.setAttribute("y", n.canvasY + 24);
+    moneyLine.setAttribute("class", "node-sub");
+    moneyLine.setAttribute("text-anchor", "middle");
+    moneyLine.textContent = payout ? moneyFmt(payout.estimatedMonthly) : "—";
+    g.appendChild(moneyLine);
 
     g.addEventListener("click", (ev) => {
       ev.stopPropagation();
@@ -201,10 +225,10 @@ function fitBox(nodes, svg) {
   if (!nodes.length) return { x: 0, y: 0, w: 1000, h: 700 };
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   nodes.forEach((n) => {
-    minX = Math.min(minX, n.canvasX);
-    minY = Math.min(minY, n.canvasY);
-    maxX = Math.max(maxX, n.canvasX + NODE_W);
-    maxY = Math.max(maxY, n.canvasY + nodeHeight(n));
+    minX = Math.min(minX, n.canvasX - NODE_R);
+    minY = Math.min(minY, n.canvasY - NODE_R);
+    maxX = Math.max(maxX, n.canvasX + NODE_R);
+    maxY = Math.max(maxY, n.canvasY + NODE_R);
   });
   const pad = 60;
   minX -= pad; minY -= pad; maxX += pad; maxY += pad;
@@ -266,7 +290,7 @@ function renderSummary(kind) {
   const el = document.getElementById(which + "-summary");
   if (!root) { el.textContent = "No structure yet."; return; }
   const rank = root.currentRank ? root.currentRank.title : "";
-  el.textContent = `${money(root.estimatedMonthly)} · ${rank} · ${pct(root.performancePercent)} · G ${pv(root.group.pv)} PV · ${root.maxPercentLegs}×25%`;
+  el.textContent = `Group ${pv(root.group.pv)} PV · ${pv(root.group.bv)} BV · Est. monthly ${money(root.estimatedMonthly)} · ${rank} · ${pct(root.performancePercent)} · ${root.maxPercentLegs}×25%`;
 }
 
 // ---------- Node inspector ----------
@@ -288,6 +312,7 @@ function renderInspector(which, kind, nodeId) {
     <label class="toggle"><input type="checkbox" id="insp-couple" ${m.isCouple ? "checked" : ""}/> Couple</label>
     <label id="insp-partner-wrap" style="${m.isCouple ? "" : "display:none"}">Partner name<input id="insp-partner" value="${escapeHtml(m.partnerName || "")}" /></label>
     <label>Personal PV<input id="insp-pv" type="number" min="0" step="10" value="${node.personalPv}" /></label>
+    <label>VCS PV<input id="insp-vcs" type="number" min="0" step="10" value="${node.vcsPv != null ? node.vcsPv : (node.personalPv * (store.state.settings.vcsPercent || 0.6)).toFixed(0)}" /></label>
     <label>Notes<input id="insp-notes" value="${escapeHtml(m.notes || "")}" /></label>
     ${you ? "" : `<label>Upline<select id="insp-parent"><option value="">— none —</option>${parentOptions}</select></label>`}
     <div class="row-btns">
@@ -314,6 +339,7 @@ function renderInspector(which, kind, nodeId) {
       partnerName: val("insp-partner") || "",
       notes: val("insp-notes"),
       personalPv: numVal("insp-pv"),
+      vcsPv: Math.min(numVal("insp-vcs"), numVal("insp-pv")),
     };
     await mutate(api(`/api/nodes/${node.id}`, "PUT", body));
     const parentSel = document.getElementById("insp-parent");
@@ -367,6 +393,7 @@ function renderCalculator() {
     ["Ruby bonus", money(root.rubyBonus), "≥15k Ruby PV"],
     ["Plus / Elite", money(root.corePlus.performancePlusAmount), pct(root.corePlus.performancePlusPercent)],
     ["Retail", money(root.retailMargin), pct(store.state.settings.retailMarginPercent)],
+    ["FSI", money(root.fsiBonus || root.corePlus?.fsiAmount || 0), "5% of VCS BV"],
   ];
   cards.innerHTML = c.map(([k, v, d]) => `<div class="stat-card"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join("");
 }
@@ -388,6 +415,7 @@ function populateGoalsForm() {
   document.getElementById("set-ruby").checked = s.includeRubyBonus;
   document.getElementById("set-plus").checked = s.includePerformancePlus;
   document.getElementById("set-retail-on").checked = s.includeRetailMargin;
+  document.getElementById("set-fsi").checked = s.fsiEligible !== false;
 }
 
 function populateProfile() {
@@ -413,6 +441,7 @@ async function saveGoals() {
     includeRubyBonus: document.getElementById("set-ruby").checked,
     includePerformancePlus: document.getElementById("set-plus").checked,
     includeRetailMargin: document.getElementById("set-retail-on").checked,
+    fsiEligible: document.getElementById("set-fsi").checked,
   });
   setSync("Saving…", "saving");
   try {

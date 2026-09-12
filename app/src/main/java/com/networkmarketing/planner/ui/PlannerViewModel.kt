@@ -115,9 +115,8 @@ class PlannerViewModel(
         viewModelScope.launch {
             val kids = uiState.value.snapshot.children(parent.id).size
             val pos = CanvasMetrics.snapPoint(
-                parent.canvasX + kids * (CanvasMetrics.NODE_WIDTH + CanvasMetrics.GAP_X),
-                parent.canvasY + CanvasMetrics.nodeHeight(uiState.value.snapshot.isCouple(parent)) +
-                    CanvasMetrics.GAP_Y,
+                parent.canvasX + kids * (CanvasMetrics.NODE_DIAMETER + CanvasMetrics.GAP_X),
+                parent.canvasY + CanvasMetrics.NODE_DIAMETER + CanvasMetrics.GAP_Y,
             )
             repository.addNode(
                 kind = parent.kind,
@@ -171,9 +170,10 @@ class PlannerViewModel(
         notes: String,
         personalPv: Double,
         personalBv: Double,
+        vcsPv: Double? = null,
     ) {
         viewModelScope.launch {
-            repository.savePerson(node, name, partnerName, isCouple, notes, personalPv, personalBv)
+            repository.savePerson(node, name, partnerName, isCouple, notes, personalPv, personalBv, vcsPv)
         }
     }
 

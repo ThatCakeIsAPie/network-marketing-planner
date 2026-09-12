@@ -34,6 +34,7 @@ data class CorePlusStatus(
     val performancePlusPercent: Double,
     val performancePlusAmount: Double,
     val csiAmount: Double,
+    val fsiAmount: Double,
     val bfiAmount: Double,
     val bbiAmount: Double,
     val pqAnnualEstimate: Double,
@@ -55,6 +56,7 @@ data class PayoutBreakdown(
     val differential: Double,
     val performanceBonus: Double,
     val retailMargin: Double,
+    val fsiBonus: Double,
     val leadershipBonus: Double,
     val leadershipPassedToSponsor: Double,
     val depthBonus: Double,
@@ -126,7 +128,13 @@ class CompensationEngine(
                 leadershipRollUp = rollUp,
             )
         }
-        return evaluateInputs(node.personalPv, node.personalBv, frontline, settings)
+        return evaluateInputs(
+            personalPv = node.personalPv,
+            personalBv = node.personalBv,
+            frontline = frontline,
+            settings = settings,
+            vcsPercent = node.effectiveVcsPercent(settings),
+        )
     }
 
     fun evaluateInputs(
@@ -134,7 +142,9 @@ class CompensationEngine(
         personalBv: Double,
         frontline: List<FrontlineVolume>,
         settings: PlannerSettings,
+        vcsPercent: Double? = null,
     ): PayoutBreakdown {
+        val effectiveVcs = (vcsPercent ?: settings.vcsPercent).coerceIn(0.0, 1.0)
         val analyzed = frontline.map { leg ->
             val rawPercent = leg.performancePercent ?: config.bracketFor(leg.groupPv).percent
             val at25 = rawPercent + 1e-9 >= config.maxPerformancePercent ||
@@ -181,7 +191,7 @@ class CompensationEngine(
             },
         )
 
-        val rule412 = rule412Factor(settings)
+        val rule412 = rule412Factor(settings, effectiveVcs)
         val bonusablePersonalBv = personalBv * rule412
         val personalPerformance = performancePercent * bonusablePersonalBv
 
@@ -196,6 +206,17 @@ class CompensationEngine(
         val customerSalesBv = personalBv * settings.customerSalesPercent.coerceIn(0.0, 1.0)
         val retailMargin = if (settings.includeRetailMargin) {
             settings.retailMarginPercent * customerSalesBv
+        } else {
+            0.0
+        }
+
+        val vcsBv = personalBv * effectiveVcs
+        // FSI: +5% of VCS BV only — does not change performancePercent / differential.
+        val fsiBonus = if (
+            settings.fsiEligible &&
+            performancePercent + 1e-9 < config.fsiMaxPerformanceExclusive
+        ) {
+            config.fsiBonusPercent * vcsBv
         } else {
             0.0
         }
@@ -240,7 +261,8 @@ class CompensationEngine(
             0.0
         }
 
-        val plusPercent = if (settings.includePerformancePlus && silverProducer && meetsBaseline(personalPv, settings)) {
+        val baselineMet = meetsBaseline(personalPv, effectiveVcs)
+        val plusPercent = if (settings.includePerformancePlus && silverProducer && baselineMet) {
             when {
                 ruby.pv + 1e-9 >= config.performanceEliteMinPv -> config.performanceElitePercent
                 ruby.pv + 1e-9 >= config.performancePlusMinPv -> config.performancePlusPercent
@@ -251,7 +273,6 @@ class CompensationEngine(
         }
         val plusAmount = plusPercent * ruby.bv
 
-        val vcsBv = personalBv * settings.vcsPercent.coerceIn(0.0, 1.0)
         val csiAmount = if (settings.includeCsi && settings.csiEligible && performancePercent <= 0.09 + 1e-9) {
             min(config.csiMonthlyCap, max(0.0, config.csiTargetPercent - performancePercent) * vcsBv)
         } else {
@@ -261,9 +282,9 @@ class CompensationEngine(
         val legsAtLeast = { minPercent: Double ->
             analyzed.count { it.second + 1e-9 >= minPercent }
         }
-        val bfiMonth = settings.bfiEligible && meetsBaseline(personalPv, settings) &&
+        val bfiMonth = settings.bfiEligible && baselineMet &&
             performancePercent + 1e-9 >= 0.09 && legsAtLeast(0.03) >= 3
-        val bbiMonth = settings.bbiEligible && meetsBaseline(personalPv, settings) &&
+        val bbiMonth = settings.bbiEligible && baselineMet &&
             performancePercent + 1e-9 >= 0.18 && legsAtLeast(0.06) >= 3
         val bfiAmount = if (bfiMonth) config.bfiPerformanceMultiplier * performanceBonus else 0.0
         val bbiAmount = if (bbiMonth) config.bbiPerformanceMultiplier * performanceBonus else 0.0
@@ -273,6 +294,7 @@ class CompensationEngine(
         val corePlus = buildCorePlus(
             personalPv = personalPv,
             settings = settings,
+            vcsPercent = effectiveVcs,
             silverProducer = silverProducer,
             pqMonth = pqMonth,
             fqCount = fqCount,
@@ -283,12 +305,14 @@ class CompensationEngine(
             plusPercent = plusPercent,
             plusAmount = plusAmount,
             csiAmount = csiAmount,
+            fsiAmount = fsiBonus,
             bfiAmount = bfiAmount,
             bbiAmount = bbiAmount,
             rubyPv = ruby.pv,
+            performancePercent = performancePercent,
         )
 
-        val estimated = performanceBonus + retailMargin + leadership.kept + depthBonus +
+        val estimated = performanceBonus + retailMargin + fsiBonus + leadership.kept + depthBonus +
             rubyBonus + plusAmount + csiAmount + bfiAmount + bbiAmount
 
         val ytdSilver = settings.silverProducerMonthsPy + if (silverProducer) 1 else 0
@@ -321,6 +345,7 @@ class CompensationEngine(
             differential = differential,
             performanceBonus = performanceBonus,
             retailMargin = retailMargin,
+            fsiBonus = fsiBonus,
             leadershipBonus = leadership.kept,
             leadershipPassedToSponsor = leadership.passedToSponsor,
             depthBonus = depthBonus,
@@ -347,9 +372,12 @@ class CompensationEngine(
         return rubyPv + 1e-9 >= 7_500.0 || (rubyPv + 1e-9 >= 4_000.0 && maxPercentLegs >= 1)
     }
 
-    fun rule412Factor(settings: PlannerSettings): Double {
+    fun rule412Factor(
+        settings: PlannerSettings,
+        vcsPercent: Double = settings.vcsPercent,
+    ): Double {
         val customer = settings.customerSalesPercent.coerceIn(0.0, 1.0)
-        val vcs = settings.vcsPercent.coerceIn(0.0, 1.0)
+        val vcs = vcsPercent.coerceIn(0.0, 1.0)
         if (customer + 1e-9 >= config.rule412CustomerSalesMin && vcs + 1e-9 >= config.rule412VcsMin) {
             return 1.0
         }
@@ -420,13 +448,17 @@ class CompensationEngine(
 
     fun bvForPv(pv: Double, settings: PlannerSettings): Double = pv * settings.bvPerPv
 
-    fun meetsBaseline(personalPv: Double, settings: PlannerSettings): Boolean =
+    fun meetsBaseline(personalPv: Double, vcsPercent: Double): Boolean =
         personalPv + 1e-9 >= config.baselinePersonalPv &&
-            settings.vcsPercent + 1e-9 >= config.rule412VcsMin
+            vcsPercent + 1e-9 >= config.rule412VcsMin
+
+    fun meetsBaseline(personalPv: Double, settings: PlannerSettings): Boolean =
+        meetsBaseline(personalPv, settings.vcsPercent)
 
     private fun buildCorePlus(
         personalPv: Double,
         settings: PlannerSettings,
+        vcsPercent: Double,
         silverProducer: Boolean,
         pqMonth: Boolean,
         fqCount: Int,
@@ -437,11 +469,13 @@ class CompensationEngine(
         plusPercent: Double,
         plusAmount: Double,
         csiAmount: Double,
+        fsiAmount: Double,
         bfiAmount: Double,
         bbiAmount: Double,
         rubyPv: Double,
+        performancePercent: Double,
     ): CorePlusStatus {
-        val baseline = meetsBaseline(personalPv, settings)
+        val baseline = meetsBaseline(personalPv, vcsPercent)
         val ytdPq = settings.pqMonthsPy + if (pqMonth) 1 else 0
         val ytdRuby = settings.rubyPvPy + rubyPv
         val pqTier = config.pqIncentiveTiers
@@ -449,6 +483,16 @@ class CompensationEngine(
             .maxByOrNull { it.annualAmount }
         val ytdSilver = settings.silverProducerMonthsPy + if (silverProducer) 1 else 0
         val consecutive = if (silverProducer) settings.consecutiveSilverMonths + 1 else 0
+        val fsiNote = when {
+            fsiAmount > 1e-9 ->
+                "FSI this month: ${"%.2f".format(fsiAmount)} (5% of VCS BV; schedule % unchanged for differential)."
+            !settings.fsiEligible ->
+                "FSI off (Goals). When on: 5% of VCS BV if performance stays under 18%."
+            performancePercent + 1e-9 >= config.fsiMaxPerformanceExclusive ->
+                "FSI not paid: performance reached ${"%.0f".format(performancePercent * 100)}% (must stay under 18%)."
+            else ->
+                "FSI eligible but zero VCS BV this month."
+        }
         val notes = buildList {
             add("Width (frontline): $width. Depth (25% below a 25% leg): ${if (depth >= 2) "yes" else "not this month"}.")
             add("YTD Silver Producer months including this snapshot: $ytdSilver. Consecutive Q months: $consecutive.")
@@ -458,7 +502,7 @@ class CompensationEngine(
             else if (ytdSilver >= 10) add("Founders Platinum VE: 10–11 Q months plus 90,000 Group PV or 108,000 Total Downline PV.")
             add("FQ this month: $fqCount (max 12 per leg per PY). PQ this month: ${if (pqMonth) "yes" else "no"} (Platinum+; 7,500 Ruby PV or 4,000 Ruby PV + 25% leg).")
             add("SSI: new-IBO baseline months stored as ${settings.newIboBaselineMonths}. Dollar table is not encoded — track 150 PPV + 60% VCS without a missed month after month two.")
-            add("FSI (Founders Sales Incentive): progress follows Founders Platinum / VE; payout table not encoded.")
+            add(fsiNote)
             add("Emerald/Diamond profit-sharing schedules are not encoded; pins use 3 / 6 legs at Silver Producer for six months.")
         }
         val ttci = config.twoTimeCash.map {
@@ -478,6 +522,7 @@ class CompensationEngine(
             performancePlusPercent = plusPercent,
             performancePlusAmount = plusAmount,
             csiAmount = csiAmount,
+            fsiAmount = fsiAmount,
             bfiAmount = bfiAmount,
             bbiAmount = bbiAmount,
             pqAnnualEstimate = pqTier?.annualAmount ?: 0.0,

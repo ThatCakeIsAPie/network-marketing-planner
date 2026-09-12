@@ -22,6 +22,8 @@ data class UpdateNodeRequest(
     val isCouple: Boolean = false,
     val notes: String = "",
     val personalPv: Double,
+    val personalBv: Double? = null,
+    val vcsPv: Double? = null,
     val canvasX: Float? = null,
     val canvasY: Float? = null,
 )

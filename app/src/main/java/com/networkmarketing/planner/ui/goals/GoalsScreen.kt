@@ -248,6 +248,17 @@ fun GoalsScreen(
             SettingSwitch("CSI eligible (new IBO years, ≤9%)", state.settings.csiEligible) {
                 viewModel.updateSettings(state.settings.copy(csiEligible = it, includeCsi = it))
             }
+            SettingSwitch(
+                "FSI eligible (stayed under 18% all PY)",
+                state.settings.fsiEligible,
+            ) {
+                viewModel.updateSettings(state.settings.copy(fsiEligible = it))
+            }
+            Text(
+                "FSI pays +5% of VCS BV only when this month’s performance stays under 18% (Group PV under 2,500). It does not raise differential %.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             SettingSwitch("BFI eligible", state.settings.bfiEligible) {
                 viewModel.updateSettings(state.settings.copy(bfiEligible = it))
             }

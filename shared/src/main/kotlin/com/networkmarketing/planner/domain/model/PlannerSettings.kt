@@ -16,6 +16,12 @@ data class PlannerSettings(
     val includePerformancePlus: Boolean = true,
     val includeCsi: Boolean = false,
     val csiEligible: Boolean = false,
+    /**
+     * Founders Sales Incentive planning toggle: IBO stayed under the 18% bracket
+     * for the entire PY (performance % never reaches 18%). Engine still requires
+     * this month's [performancePercent] &lt; 18% before paying the 5% FSI bonus.
+     */
+    val fsiEligible: Boolean = true,
     val bfiEligible: Boolean = true,
     val bbiEligible: Boolean = true,
     val isPlatinumOrAbove: Boolean = false,

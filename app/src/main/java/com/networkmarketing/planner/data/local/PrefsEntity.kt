@@ -22,6 +22,7 @@ data class PrefsEntity(
     val includePerformancePlus: Boolean,
     val includeCsi: Boolean,
     val csiEligible: Boolean,
+    val fsiEligible: Boolean = true,
     val bfiEligible: Boolean,
     val bbiEligible: Boolean,
     val isPlatinumOrAbove: Boolean,

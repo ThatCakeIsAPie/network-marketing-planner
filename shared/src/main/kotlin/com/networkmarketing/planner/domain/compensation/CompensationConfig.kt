@@ -75,6 +75,10 @@ data class CompensationConfig(
     val bbiPerformanceMultiplier: Double,
     val csiTargetPercent: Double,
     val csiMonthlyCap: Double,
+    /** Extra bonus on bonusable Personal BV; does not change differential %. */
+    val fsiBonusPercent: Double,
+    /** FSI requires staying strictly under this performance bracket (18%). */
+    val fsiMaxPerformanceExclusive: Double,
     val assumptions: List<String>,
 ) {
     fun bracketFor(groupPv: Double): PerformanceBracket =

@@ -276,6 +276,86 @@ class CompensationEngineTest {
     }
 
     @Test
+    fun fsiIsFivePercentOfVcsBvOnlyAndDoesNotRaiseDifferential() {
+        val personalPv = 1_000.0
+        val personalBv = 3_000.0
+        val childBv = 600.0
+        val vcsPercent = 0.60
+        val settings = ratio3.copy(
+            includeLeadershipBonus = false,
+            includeRubyBonus = false,
+            includeRetailMargin = false,
+            fsiEligible = true,
+            vcsPercent = vcsPercent,
+        )
+        val withFsi = engine.evaluateInputs(
+            personalPv = personalPv,
+            personalBv = personalBv,
+            frontline = listOf(FrontlineVolume("A", 200.0, childBv)),
+            settings = settings,
+            vcsPercent = vcsPercent,
+        )
+        // Under 18%: group 1,200 PV → 12%. FSI = 5% × VCS BV = 0.05 × 0.60 × 3,000.
+        assertEquals(0.12, withFsi.performancePercent, 0.0)
+        assertEquals(0.05 * personalBv * vcsPercent, withFsi.fsiBonus, 0.01)
+        assertEquals(0.05 * personalBv * vcsPercent, withFsi.corePlus.fsiAmount, 0.01)
+        // Differential still uses schedule % only (12% − 3%), not schedule+FSI.
+        assertEquals((0.12 - 0.03) * childBv, withFsi.differential, 0.01)
+        assertTrue(withFsi.estimatedMonthly + 1e-9 >= withFsi.fsiBonus)
+
+        val off = engine.evaluateInputs(
+            personalPv = personalPv,
+            personalBv = personalBv,
+            frontline = listOf(FrontlineVolume("A", 200.0, childBv)),
+            settings = settings.copy(fsiEligible = false),
+            vcsPercent = vcsPercent,
+        )
+        assertEquals(0.0, off.fsiBonus, 0.0)
+        assertEquals(withFsi.differential, off.differential, 0.01)
+        assertEquals(withFsi.performancePercent, off.performancePercent, 0.0)
+
+        val at18 = engine.evaluateInputs(
+            personalPv = 2_500.0,
+            personalBv = 7_500.0,
+            frontline = emptyList(),
+            settings = settings.copy(includeLeadershipBonus = false, includeRubyBonus = false),
+            vcsPercent = vcsPercent,
+        )
+        assertEquals(0.18, at18.performancePercent, 0.0)
+        assertEquals(0.0, at18.fsiBonus, 0.0)
+    }
+
+    @Test
+    fun perNodeVcsOverridesGlobalForRule412AndFsi() {
+        val snapshot = OrgSnapshot(
+            members = listOf(Member("you", "You", isYou = true)),
+            nodes = listOf(
+                OrgNode(
+                    id = "n0",
+                    memberId = "you",
+                    parentId = null,
+                    kind = StructureKind.CURRENT,
+                    personalPv = 1_000.0,
+                    personalBv = 3_000.0,
+                    vcsPv = 300.0, // 30% VCS → Rule 4.12 proration; FSI on VCS BV only
+                ),
+            ),
+        )
+        val settings = ratio3.copy(
+            includeLeadershipBonus = false,
+            includeRubyBonus = false,
+            includeRetailMargin = false,
+            fsiEligible = true,
+            vcsPercent = 0.60,
+            customerSalesPercent = 0.70,
+        )
+        val payout = engine.evaluateRoot(snapshot, StructureKind.CURRENT, settings)
+        requireNotNull(payout)
+        assertEquals(0.5, payout.rule412Factor, 0.01) // min(0.70/0.70, 0.30/0.60)
+        assertEquals(0.05 * 3_000.0 * 0.30, payout.fsiBonus, 0.01)
+    }
+
+    @Test
     fun gapAnalyzerReportsIncomeShortfallAgainstSilverGoal() {
         val snapshot = SampleData.snapshot(3.43)
         val gap = GapAnalyzer(engine).compare(

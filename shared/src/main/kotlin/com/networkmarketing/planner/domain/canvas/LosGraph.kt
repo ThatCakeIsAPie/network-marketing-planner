@@ -1,25 +1,12 @@
 package com.networkmarketing.planner.domain.canvas
 
-import com.networkmarketing.planner.domain.model.OrgNode
 import com.networkmarketing.planner.domain.model.OrgSnapshot
-
-enum class DockKind {
-    UPLINE,
-    DOWNLINE,
-}
-
-data class NodePort(
-    val nodeId: String,
-    val kind: DockKind,
-    val index: Int = 0,
-)
 
 /**
  * Line-of-Sponsorship helpers for the node canvas.
  *
- * Faleth: one edge per port; reconnect replaces. Here that means:
- * - Top (upline) port: at most one sponsor.
- * - Bottom ports: one per existing frontline plus one vacant port to add/rewire.
+ * Graph UX: drag a node onto another to make it downline; dwell on empty to detach.
+ * Port/dock APIs remain for older tests but are unused by the circle canvas.
  */
 object LosGraph {
     fun wouldCreateCycle(snapshot: OrgSnapshot, childId: String, newParentId: String?): Boolean {
@@ -44,18 +31,34 @@ object LosGraph {
         return !wouldCreateCycle(snapshot, childId, newParentId)
     }
 
-    fun downlineChild(snapshot: OrgSnapshot, parentId: String, portIndex: Int): OrgNode? =
-        snapshot.children(parentId).getOrNull(portIndex)
-
-    fun downlinePortCount(snapshot: OrgSnapshot, parentId: String): Int =
-        CanvasMetrics.downlinePortCount(snapshot.children(parentId).size)
-
     data class ConnectionEdit(
         val childId: String,
         val newParentId: String?,
         val detachId: String? = null,
     )
 
+    /** Make [childId] a downline of [newParentId] (or detach when null). */
+    fun resolveReparent(
+        snapshot: OrgSnapshot,
+        childId: String,
+        newParentId: String?,
+    ): ConnectionEdit? {
+        if (!canSetParent(snapshot, childId, newParentId)) return null
+        return ConnectionEdit(childId = childId, newParentId = newParentId)
+    }
+
+    fun resolveDetach(snapshot: OrgSnapshot, childId: String): ConnectionEdit? =
+        resolveReparent(snapshot, childId, null)
+
+    @Deprecated("Dock ports removed; use resolveReparent")
+    fun downlineChild(snapshot: OrgSnapshot, parentId: String, portIndex: Int) =
+        snapshot.children(parentId).getOrNull(portIndex)
+
+    @Deprecated("Dock ports removed")
+    fun downlinePortCount(snapshot: OrgSnapshot, parentId: String): Int =
+        snapshot.children(parentId).size + 1
+
+    @Deprecated("Dock ports removed; use resolveReparent")
     fun resolveConnection(
         snapshot: OrgSnapshot,
         from: NodePort,
@@ -81,6 +84,7 @@ object LosGraph {
         return ConnectionEdit(childId = childId, newParentId = parentId, detachId = detach)
     }
 
+    @Deprecated("Dock ports removed; use resolveDetach")
     fun resolveDropOnEmpty(snapshot: OrgSnapshot, from: NodePort): ConnectionEdit? {
         return when (from.kind) {
             DockKind.UPLINE -> {
@@ -95,3 +99,14 @@ object LosGraph {
         }
     }
 }
+
+enum class DockKind {
+    UPLINE,
+    DOWNLINE,
+}
+
+data class NodePort(
+    val nodeId: String,
+    val kind: DockKind,
+    val index: Int = 0,
+)

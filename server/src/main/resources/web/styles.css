@@ -135,13 +135,13 @@ main { max-width: 1100px; margin: 0 auto; padding: 16px; }
 }
 .org-canvas:active { cursor: grabbing; }
 
-.node-rect { fill: var(--card); stroke: var(--line); stroke-width: 1.5; rx: 12; cursor: pointer; }
-.node-rect.you { fill: #e7f2ec; stroke: var(--green); }
-.node-rect.selected { stroke: var(--gold); stroke-width: 3; }
-.node-title { font-size: 15px; font-weight: 700; fill: var(--ink); }
-.node-sub { font-size: 12px; fill: var(--muted); }
+.node-circle { fill: #ffffff; stroke: #1e1e1e; stroke-width: 1.5; cursor: pointer; }
+.node-circle.you { stroke: var(--green); stroke-width: 2; }
+.node-circle.selected { stroke: var(--gold); stroke-width: 3; }
+.node-title { font-size: 12px; font-weight: 700; fill: #1e1e1e; }
+.node-sub { font-size: 11px; fill: #1e1e1e; }
 .node-badge { font-size: 11px; font-weight: 700; }
-.edge { stroke: #9bb3a7; stroke-width: 2; fill: none; }
+.edge { stroke: #1e1e1e; stroke-width: 2; fill: none; }
 
 .inspector {
     position: absolute;

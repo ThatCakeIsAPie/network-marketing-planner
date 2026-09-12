@@ -33,8 +33,10 @@ object SnapshotOps {
 
         val parent = parentId?.let { snapshot.node(it) }
         val siblings = parentId?.let { snapshot.children(it).size } ?: 0
-        val fallbackX = (parent?.canvasX ?: 48f) + siblings * (CanvasMetrics.NODE_WIDTH + CanvasMetrics.GAP_X)
-        val fallbackY = (parent?.canvasY ?: 48f) + CanvasMetrics.NODE_HEIGHT + CanvasMetrics.GAP_Y
+        val fallbackX = (parent?.canvasX ?: (80f + CanvasMetrics.NODE_RADIUS)) +
+            siblings * (CanvasMetrics.NODE_DIAMETER + CanvasMetrics.GAP_X)
+        val fallbackY = (parent?.canvasY ?: (80f + CanvasMetrics.NODE_RADIUS)) +
+            CanvasMetrics.NODE_DIAMETER + CanvasMetrics.GAP_Y
         val pos = CanvasMetrics.snapPoint(canvasX ?: fallbackX, canvasY ?: fallbackY)
 
         val member = Member(
@@ -69,6 +71,7 @@ object SnapshotOps {
         notes: String,
         personalPv: Double,
         personalBv: Double,
+        vcsPv: Double? = null,
     ): OrgSnapshot {
         val node = snapshot.node(nodeId) ?: return snapshot
         val isYou = snapshot.isYou(node)
@@ -85,8 +88,13 @@ object SnapshotOps {
                 member
             }
         }
+        val cappedVcs = vcsPv?.coerceIn(0.0, personalPv.coerceAtLeast(0.0))
         val nodes = snapshot.nodes.map {
-            if (it.id == nodeId) it.copy(personalPv = personalPv, personalBv = personalBv) else it
+            if (it.id == nodeId) {
+                it.copy(personalPv = personalPv, personalBv = personalBv, vcsPv = cappedVcs)
+            } else {
+                it
+            }
         }
         return snapshot.copy(members = members, nodes = nodes)
     }

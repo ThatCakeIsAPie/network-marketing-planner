@@ -53,9 +53,9 @@ fun PlanScreen(
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
     var fitted by remember { mutableStateOf(false) }
     var editorOpen by remember { mutableStateOf(false) }
-    var selectedId by remember { mutableStateOf<String?>(null) }
+    var selectedIds by remember { mutableStateOf(setOf<String>()) }
     val nodes = state.snapshot.nodes(StructureKind.IDEAL)
-    val selected = selectedId?.let { state.snapshot.node(it) }
+    val selected = selectedIds.singleOrNull()?.let { state.snapshot.node(it) }
     val gap = state.gap
 
     LaunchedEffect(viewSize, nodes.size) {
@@ -100,6 +100,14 @@ fun PlanScreen(
                     Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    val idealPayout = state.idealPayout
+                    if (idealPayout != null) {
+                        Text(
+                            "Group ${qty(idealPayout.group.pv)} PV · ${qty(idealPayout.group.bv)} BV · " +
+                                "Est. monthly ${money(idealPayout.estimatedMonthly)}",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
                     if (gap != null) {
                         MetricRow {
                             MetricCard("PV to ideal", qty(gap.groupPvGap), Modifier.weight(1f))
@@ -135,12 +143,12 @@ fun PlanScreen(
                     snapshot = state.snapshot,
                     kind = StructureKind.IDEAL,
                     payouts = state.idealPayouts,
-                    selectedId = selected?.id,
+                    selectedIds = selectedIds,
                     viewport = viewport,
                     onViewportChange = { viewport = it },
-                    onSelect = {
-                        selectedId = it
-                        editorOpen = it != null
+                    onSelectionChange = { ids ->
+                        selectedIds = ids
+                        editorOpen = ids.size == 1
                     },
                     onMoveEnd = { node, x, y -> viewModel.moveNode(node, x, y) },
                     onApplyConnection = { viewModel.applyLosEdit(it) },
@@ -162,8 +170,8 @@ fun PlanScreen(
             settings = state.settings,
             payout = state.idealPayouts[selected.id],
             onDismiss = { editorOpen = false },
-            onSave = { name, partner, couple, notes, pv, bv ->
-                viewModel.savePerson(selected, name, partner, couple, notes, pv, bv)
+            onSave = { name, partner, couple, notes, pv, bv, vcs ->
+                viewModel.savePerson(selected, name, partner, couple, notes, pv, bv, vcs)
                 editorOpen = false
             },
             onAddDownline = {

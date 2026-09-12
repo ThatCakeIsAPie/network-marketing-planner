@@ -1,37 +1,46 @@
 package com.networkmarketing.planner.domain.canvas
 
+import kotlin.math.hypot
 import kotlin.math.round
 
 object CanvasMetrics {
     const val GRID = 20f
-    const val NODE_WIDTH = 220f
-    const val NODE_HEIGHT = 140f
-    const val NODE_HEIGHT_COUPLE = 160f
-    const val DOCK = 16f
-    const val DOCK_HIT = 28f
-    const val GAP_X = 40f
-    const val GAP_Y = 100f
+    /** Circle radius in world dp (tldraw / Obsidian-style graph nodes). */
+    const val NODE_RADIUS = 56f
+    const val NODE_DIAMETER = NODE_RADIUS * 2f
+    const val GAP_X = 48f
+    const val GAP_Y = 48f
     const val WORLD_WIDTH = 4200f
     const val WORLD_HEIGHT = 3200f
+    /** How long (ms) to dwell on empty before detach is armed. */
+    const val DETACH_DWELL_MS = 400L
 
-    fun nodeHeight(couple: Boolean): Float = if (couple) NODE_HEIGHT_COUPLE else NODE_HEIGHT
+    /** @deprecated Prefer [NODE_DIAMETER]; kept for callers during the circle migration. */
+    const val NODE_WIDTH = NODE_DIAMETER
+    /** @deprecated Circles use [NODE_DIAMETER]; height equals diameter. */
+    const val NODE_HEIGHT = NODE_DIAMETER
+    const val NODE_HEIGHT_COUPLE = NODE_DIAMETER
+
+    fun nodeHeight(@Suppress("UNUSED_PARAMETER") couple: Boolean): Float = NODE_DIAMETER
 
     fun snap(value: Float): Float = round(value / GRID) * GRID
 
+    /** Snap a circle-center point into the world. */
     fun snapPoint(x: Float, y: Float): Pair<Float, Float> =
-        snap(x).coerceIn(0f, WORLD_WIDTH - NODE_WIDTH) to
-            snap(y).coerceIn(0f, WORLD_HEIGHT - NODE_HEIGHT_COUPLE)
+        snap(x).coerceIn(NODE_RADIUS, WORLD_WIDTH - NODE_RADIUS) to
+            snap(y).coerceIn(NODE_RADIUS, WORLD_HEIGHT - NODE_RADIUS)
 
-    fun uplineDock(x: Float, y: Float): Pair<Float, Float> =
-        (x + NODE_WIDTH / 2f) to (y + DOCK / 2f)
-
-    fun downlinePortCount(frontline: Int): Int = frontline + 1
-
-    fun downlineDock(x: Float, y: Float, height: Float, index: Int, count: Int): Pair<Float, Float> {
-        val safeCount = count.coerceAtLeast(1)
-        val inset = 16f
-        val usable = NODE_WIDTH - inset * 2f
-        val t = if (safeCount == 1) 0.5f else index.toFloat() / (safeCount - 1).toFloat()
-        return (x + inset + t * usable) to (y + height - DOCK / 2f)
+    /**
+     * Rim point on the circle at [center] facing toward [toward].
+     * If centers coincide, returns [center].
+     */
+    fun rimPoint(centerX: Float, centerY: Float, towardX: Float, towardY: Float): Pair<Float, Float> {
+        val dx = towardX - centerX
+        val dy = towardY - centerY
+        val len = hypot(dx.toDouble(), dy.toDouble()).toFloat()
+        if (len < 1e-3f) return centerX to centerY
+        val ux = dx / len
+        val uy = dy / len
+        return (centerX + ux * NODE_RADIUS) to (centerY + uy * NODE_RADIUS)
     }
 }

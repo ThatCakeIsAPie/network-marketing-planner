@@ -1,8 +1,8 @@
 package com.networkmarketing.planner.domain.canvas
 
 /**
- * Faleth-style orthogonal connector: mid-X elbow (horizontal, vertical, horizontal).
- * Ports here are top/bottom instead of Faleth's left/right, but the path math is the same.
+ * Straight graph edges between circle rims (Obsidian / tldraw style).
+ * [ElbowPath.midX] remains for legacy tests; the Map/Plan canvas uses [straight].
  */
 data class WorldPoint(val x: Float, val y: Float)
 
@@ -16,4 +16,6 @@ object ElbowPath {
             to,
         )
     }
+
+    fun straight(from: WorldPoint, to: WorldPoint): List<WorldPoint> = listOf(from, to)
 }

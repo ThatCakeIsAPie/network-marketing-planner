@@ -91,8 +91,12 @@ class RemotePlannerRepository(
         notes: String,
         personalPv: Double,
         personalBv: Double,
+        vcsPv: Double?,
     ) {
-        put("$base/api/nodes/${node.id}", UpdateNodeReq(name, partnerName, isCouple, notes, personalPv))
+        put(
+            "$base/api/nodes/${node.id}",
+            UpdateNodeReq(name, partnerName, isCouple, notes, personalPv, personalBv, vcsPv),
+        )
     }
 
     override suspend fun updatePosition(node: OrgNode, canvasX: Float, canvasY: Float) {
@@ -168,6 +172,8 @@ private data class UpdateNodeReq(
     val isCouple: Boolean,
     val notes: String,
     val personalPv: Double,
+    val personalBv: Double? = null,
+    val vcsPv: Double? = null,
 )
 
 @Serializable

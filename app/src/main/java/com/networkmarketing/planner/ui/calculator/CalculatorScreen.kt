@@ -113,6 +113,7 @@ fun CalculatorScreen(
             MetricRow {
                 MetricCard("Plus / Elite", money(payout.corePlus.performancePlusAmount), Modifier.weight(1f), percent(payout.corePlus.performancePlusPercent))
                 MetricCard("Retail", money(payout.retailMargin), Modifier.weight(1f), percent(state.settings.retailMarginPercent))
+                MetricCard("FSI", money(payout.fsiBonus), Modifier.weight(1f), "5% of VCS BV")
             }
             Card(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

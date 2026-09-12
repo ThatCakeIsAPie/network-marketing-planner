@@ -116,7 +116,7 @@ private fun io.ktor.server.routing.Routing.plannerApi(
         val id = call.parameters["id"] ?: return@put call.respond(HttpStatusCode.BadRequest, ErrorResponse("Missing id"))
         val body = call.receive<UpdateNodeRequest>()
         val state = store.update { current ->
-            val bv = body.personalPv * current.settings.bvPerPv
+            val bv = body.personalBv ?: (body.personalPv * current.settings.bvPerPv)
             var snapshot = SnapshotOps.updatePerson(
                 snapshot = current.snapshot,
                 nodeId = id,
@@ -126,6 +126,7 @@ private fun io.ktor.server.routing.Routing.plannerApi(
                 notes = body.notes,
                 personalPv = body.personalPv,
                 personalBv = bv,
+                vcsPv = body.vcsPv,
             )
             if (body.canvasX != null && body.canvasY != null) {
                 snapshot = SnapshotOps.move(snapshot, id, body.canvasX, body.canvasY)

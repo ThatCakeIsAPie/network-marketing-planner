@@ -16,7 +16,7 @@ This project is **not affiliated with, endorsed by, or sponsored by** any networ
 
 | Tab | Purpose |
 | --- | --- |
-| **Map** | Infinite 20 dp grid canvas (pan, pinch / +− zoom, Fit, 100%). IBO nodes with single/couple names, PV/BV, top **upline** and bottom **downline** docks. Drag dock-to-dock to set Line of Sponsorship. Positions persist in Room. |
+| **Map** | Infinite 20 dp grid canvas (pan, pinch / +− zoom, Fit, 100%). Circular IBO nodes (name · PV · $) with straight arrow edges for Line of Sponsorship. Drag a node onto another to set upline; dwell on empty to detach. Positions persist in Room. |
 | **Plan** | Same node canvas for the ideal structure, plus gap vs the current map. |
 | **Calculator** | PV/BV inputs (or “use current org”), Core Plan payout lines, Plus/Elite, Rule 4.12 factor, rank progress. |
 | **Goals** | Income/rank goals, retail 10/15/20%, Rule 4.12 / VCS, YTD Q/PQ counters, bonus toggles, full assumption list. |
@@ -52,17 +52,18 @@ Extensible types live under `shared/src/main/kotlin/com/networkmarketing/planner
 - `Member` — a person or couple (`isCouple`, `partnerName`)
 - `OrgNode` — that person placed in `CURRENT` or `IDEAL` with monthly personal PV/BV and canvas `x/y`
 - `OrgSnapshot` — members + nodes; **team volume** is personal + all descendants
-- `LosGraph` / `ElbowPath` / `TreeLayout` — Line of Sponsorship wiring, Faleth-style mid-X elbows, auto-layout
+- `LosGraph` / `ElbowPath` / `TreeLayout` — Line of Sponsorship wiring, straight arrow edges, auto-layout (circle centers)
 
 ## Using the Map canvas
 
-1. **Pan** by dragging empty grid. **Zoom** with pinch or the + / − / 100% / Fit controls (0.25×–2.0×).
-2. **Move** a person by dragging the card; positions snap to the 20 dp grid and save locally.
-3. **LOS:** drag the **top dock** (upline) or a **bottom dock** (one port per frontline plus a vacant add port) to another dock. One edge per port; reconnecting replaces the old link. Drop a vacant bottom dock on empty grid to add a downline.
-4. **Tap** a node for the inspector: single vs couple, names, PV, BV (default PV × 3.43), notes, detach, delete.
+1. **Pan** with two fingers (or empty-grid marquee select with one finger). **Zoom** with pinch or the + / − / 100% / Fit controls (0.25×–2.0×).
+2. **Move** a person by dragging their circle; positions snap to the 20 dp grid and save locally.
+3. **LOS:** drag a circle onto another to make it **downline** of the target. Hold a downline over empty canvas (~400 ms) until “Release to detach” appears, then release. Sheet still has Add downline / Detach.
+4. **Tap** a node for the inspector: single vs couple, names, PV, VCS PV, BV, notes, detach, delete.
 5. Sample data opens as a positioned graph, including one couple (Alex & Chris).
 
-The canvas mirrors the Faleth CRM workspace *feel* (custom grid, pan/zoom, port wiring, orthogonal mid-X elbows). Faleth’s left/right workflow ports and ticket/point semantics are **not** used — this graph is Line of Sponsorship for people and AmwayNA_PY2027 volume. The Faleth repo was not readable from this environment; behavior follows the documented TemplateGraphEditor pattern.
+The Map is an Obsidian/tldraw-style graph (circles + straight arrows) for Line of Sponsorship and AmwayNA_PY2027 volume — not a docked Faleth workflow editor.
+
 - `UserGoals` / `PlannerSettings` — income/rank targets, Rule 4.12, YTD pin counters
 - `CompensationConfig` (`AmwayNA_PY2027`) + `CompensationEngine` + `LeadershipBonus` — **the only place payout math should change**
 
@@ -95,7 +96,7 @@ Rates live in `AmwayNaPy2027.kt`. Formulas live in `CompensationEngine.kt` and `
 - **PQ (Platinum+):** 7,500 Ruby PV **or** 4,000 Ruby PV + a 25% leg. Annual table: 6–11 PQ → \$6,000; 12 PQ → \$18,000; 12 PQ + 90,000 Ruby PV → \$20,000 (shown from YTD inputs, not folded into monthly estimated payout).
 - **FQ:** one per 25% frontline per month (max 12 per leg per PY).
 - **TTCI:** Platinum first-time ≥6 Q months in 12 rolling with 3 consecutive; requal ≥6 in the PY. Founders Platinum: 12 Q months (VE: 10–11 with 90k Group PV or 108k Total Downline PV). Documented first/second year amounts \$1,500/\$3,500 and \$2,500/\$7,500 — confirm against the current PY table.
-- **FSI:** progress follows Founders Platinum / VE; payout table not encoded.
+- **FSI:** +5% of **VCS BV** (`VCS PV × BV:PV`) as an extra bonus when Goals FSI is on and this month’s performance % stays under 18% (planning stand-in for “never hit 18% in the PY”). Does **not** raise the schedule % used for differential. Per-node VCS PV on the Map/Plan editor drives Rule 4.12 and FSI for that IBO (Goals VCS % is the default when unset).
 - **Emerald / Diamond:** pin progress (3 / 6 Silver Producer legs for six months). Profit-sharing schedules are **not** encoded.
 
 ## Build and run

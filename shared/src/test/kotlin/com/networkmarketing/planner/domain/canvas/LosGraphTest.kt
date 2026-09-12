@@ -33,9 +33,9 @@ class LosGraphTest {
     fun snapAlignsToTwentyDpGrid() {
         assertEquals(20f, CanvasMetrics.snap(18f), 0.0f)
         assertEquals(40f, CanvasMetrics.snap(31f), 0.0f)
-        val pt = CanvasMetrics.snapPoint(33f, 47f)
-        assertEquals(40f, pt.first, 0.0f)
-        assertEquals(40f, pt.second, 0.0f)
+        val pt = CanvasMetrics.snapPoint(73f, 87f)
+        assertEquals(80f, pt.first, 0.0f)
+        assertEquals(80f, pt.second, 0.0f)
     }
 
     @Test
@@ -53,6 +53,22 @@ class LosGraphTest {
         assertTrue(LosGraph.wouldCreateCycle(snapshot, "n-you", "n-c"))
         assertFalse(LosGraph.wouldCreateCycle(snapshot, "n-c", "n-b"))
         assertFalse(LosGraph.canSetParent(snapshot, "n-you", "n-a"))
+    }
+
+    @Test
+    fun reparentSetsChildParent() {
+        val edit = LosGraph.resolveReparent(snapshot, "n-c", "n-b")
+        requireNotNull(edit)
+        assertEquals("n-c", edit.childId)
+        assertEquals("n-b", edit.newParentId)
+    }
+
+    @Test
+    fun detachClearsParent() {
+        val edit = LosGraph.resolveDetach(snapshot, "n-c")
+        requireNotNull(edit)
+        assertEquals("n-c", edit.childId)
+        assertNull(edit.newParentId)
     }
 
     @Test

@@ -81,6 +81,7 @@ class PlannerRepository(
                 includePerformancePlus = settings.includePerformancePlus,
                 includeCsi = settings.includeCsi,
                 csiEligible = settings.csiEligible,
+                fsiEligible = settings.fsiEligible,
                 bfiEligible = settings.bfiEligible,
                 bbiEligible = settings.bbiEligible,
                 isPlatinumOrAbove = settings.isPlatinumOrAbove,
@@ -115,8 +116,8 @@ class PlannerRepository(
         val siblingCount = 0
         addNode(
             kind = parent.kind,
-            canvasX = parent.canvasX + siblingCount * (CanvasMetrics.NODE_WIDTH + CanvasMetrics.GAP_X),
-            canvasY = parent.canvasY + CanvasMetrics.NODE_HEIGHT + CanvasMetrics.GAP_Y,
+            canvasX = parent.canvasX + siblingCount * (CanvasMetrics.NODE_DIAMETER + CanvasMetrics.GAP_X),
+            canvasY = parent.canvasY + CanvasMetrics.NODE_DIAMETER + CanvasMetrics.GAP_Y,
             parentId = parent.id,
             name = name,
             personalPv = personalPv,
@@ -172,6 +173,7 @@ class PlannerRepository(
         notes: String,
         personalPv: Double,
         personalBv: Double,
+        vcsPv: Double?,
     ) {
         dao.upsertMember(
             MemberEntity(
@@ -183,8 +185,9 @@ class PlannerRepository(
                 isCouple = isCouple,
             ),
         )
+        val cappedVcs = vcsPv?.coerceIn(0.0, personalPv.coerceAtLeast(0.0))
         dao.updateNode(
-            node.copy(personalPv = personalPv, personalBv = personalBv).toEntity(),
+            node.copy(personalPv = personalPv, personalBv = personalBv, vcsPv = cappedVcs).toEntity(),
         )
     }
 
@@ -197,6 +200,7 @@ class PlannerRepository(
             notes = "",
             personalPv = personalPv,
             personalBv = personalBv,
+            vcsPv = node.vcsPv,
         )
     }
 
@@ -275,6 +279,7 @@ class PlannerRepository(
         includePerformancePlus = true,
         includeCsi = false,
         csiEligible = false,
+        fsiEligible = true,
         bfiEligible = true,
         bbiEligible = true,
         isPlatinumOrAbove = false,
@@ -301,6 +306,7 @@ private fun OrgNodeEntity.toModel() = OrgNode(
     kind = StructureKind.valueOf(kind),
     personalPv = personalPv,
     personalBv = personalBv,
+    vcsPv = vcsPv,
     canvasX = canvasX,
     canvasY = canvasY,
 )
@@ -312,6 +318,7 @@ private fun OrgNode.toEntity() = OrgNodeEntity(
     kind = kind.name,
     personalPv = personalPv,
     personalBv = personalBv,
+    vcsPv = vcsPv,
     canvasX = canvasX,
     canvasY = canvasY,
 )
@@ -336,6 +343,7 @@ private fun PrefsEntity.toSettings() = PlannerSettings(
     includePerformancePlus = includePerformancePlus,
     includeCsi = includeCsi,
     csiEligible = csiEligible,
+    fsiEligible = fsiEligible,
     bfiEligible = bfiEligible,
     bbiEligible = bbiEligible,
     isPlatinumOrAbove = isPlatinumOrAbove,
